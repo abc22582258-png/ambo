@@ -23,10 +23,15 @@
 
     async function initFirebase() {
         try {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-v2';
             const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
             const config = JSON.parse(configStr);
-            if (Object.keys(config).length === 0) return;
+            if (Object.keys(config).length === 0) {
+                // 如果是在 GitHub Pages 上，沒有環境變數時提供安全的預備機制
+                window.fbStoreReady = false;
+                window.dispatchEvent(new Event('firebase-ready'));
+                return;
+            }
 
             const app = initializeApp(config);
             const auth = getAuth(app);
@@ -37,8 +42,13 @@
             else await signInAnonymously(auth);
 
             window.fbStore = { db, auth, appId, doc, setDoc, onSnapshot };
+            window.fbStoreReady = true;
             window.dispatchEvent(new Event('firebase-ready'));
-        } catch (e) { console.error("雲端存檔啟動失敗:", e); }
+        } catch (e) { 
+            console.error("雲端存檔啟動失敗:", e); 
+            window.fbStoreReady = false;
+            window.dispatchEvent(new Event('firebase-ready'));
+        }
     }
     initFirebase();
   </script>
@@ -58,10 +68,12 @@
       const [currentDate, setCurrentDate] = useState(new Date()); 
       const [dayStatuses, setDayStatuses] = useState({});
       const [isReadOnly, setIsReadOnly] = useState(true); // 預設為唯讀模式 (客人視角)
+      const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-      // 動態計算 3 個月範圍
-      const minAllowedDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      const maxAllowedDate = new Date(new Date().getFullYear(), new Date().getMonth() + 2, 1);
+      // 動態計算 3 個月範圍 (當月、下個月、下下個月)
+      const now = new Date();
+      const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
 
       useEffect(() => {
         // 檢查網址是否有管理員暗號 (例如 ?admin=true)
@@ -77,21 +89,40 @@
       useEffect(() => {
           let unsubscribe = null;
           const setupSync = () => {
-              if (!window.fbStore || !window.fbStore.auth.currentUser) return;
+              // 如果是在本機或沒有雲端環境，改用 LocalStorage 作為備用，確保不會歸零
+              if (!window.fbStore || !window.fbStore.auth.currentUser) {
+                  const localData = localStorage.getItem('ambo_calendar_fallback');
+                  if (localData) {
+                      try { setDayStatuses(JSON.parse(localData)); } catch(e) {}
+                  }
+                  setIsDataLoaded(true);
+                  return;
+              }
+
               const { db, auth, appId, doc, onSnapshot } = window.fbStore;
               const userId = auth.currentUser.uid;
               const docRef = doc(db, 'artifacts', appId, 'users', userId, 'calendar', 'statusData');
               
               unsubscribe = onSnapshot(docRef, (snapshot) => {
                   if (snapshot.exists()) {
-                      setDayStatuses(snapshot.data().statuses || {});
+                      const data = snapshot.data().statuses || {};
+                      setDayStatuses(data);
+                      // 同時備份到本機
+                      localStorage.setItem('ambo_calendar_fallback', JSON.stringify(data));
                   }
+                  setIsDataLoaded(true);
               }, (error) => {
                   console.error("讀取存檔失敗:", error);
+                  // 讀取失敗時降級讀取本機
+                  const localData = localStorage.getItem('ambo_calendar_fallback');
+                  if (localData) {
+                      try { setDayStatuses(JSON.parse(localData)); } catch(e) {}
+                  }
+                  setIsDataLoaded(true);
               });
           };
 
-          if (window.fbStore) setupSync();
+          if (window.fbStoreReady !== undefined) setupSync();
           else window.addEventListener('firebase-ready', setupSync);
 
           return () => {
@@ -112,13 +143,13 @@
 
       const handlePrevMonth = () => {
         const target = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        if (isReadOnly && target < minAllowedDate) return;
+        if (target < minAllowedDate) return;
         setCurrentDate(target);
       };
 
       const handleNextMonth = () => {
         const target = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-        if (isReadOnly && target > maxAllowedDate) return;
+        if (target > maxAllowedDate) return;
         setCurrentDate(target);
       };
 
@@ -135,6 +166,9 @@
           
           const newStatuses = { ...prev, [dateKey]: nextStatus };
           
+          // 備份到本機
+          localStorage.setItem('ambo_calendar_fallback', JSON.stringify(newStatuses));
+
           // 自動將新紀錄即時存進雲端資料庫
           if (window.fbStore && window.fbStore.auth.currentUser) {
               const { db, auth, appId, doc, setDoc } = window.fbStore;
@@ -197,20 +231,17 @@
             </button>
           </div>
 
-          {/* 日曆卡片主體 - 70% 透明度 */}
+          {/* 日曆卡片主體 */}
           <div className="w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col">
             
-            {/* 頂部專屬品牌小字 */}
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 text-[8px] font-medium tracking-[0.15em] text-[#A89B90] pointer-events-none">
               ▪︎AMBO.ART▪︎
             </div>
 
-            {/* 左上角小星星裝飾 */}
             <svg className="absolute top-5 left-5 w-5 h-5 text-[#CDBEAD]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" strokeLinejoin="round"/>
             </svg>
 
-            {/* 右上角可愛日系手繪大小雙花 */}
             <svg className="absolute top-[18px] right-[18px] w-[28px] h-[28px] text-[#CDBEAD]" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <g transform="translate(0, 6) scale(0.85)">
                 <path d="M12 6.5C13.5 3 18 4.5 17.5 8C21.5 8.5 21.5 14 18 15C19 19 14.5 21.5 12 18.5C9.5 21.5 5 19 6 15C2.5 14 2.5 8.5 6.5 8C6 4.5 10.5 3 12 6.5Z"/>
@@ -222,7 +253,6 @@
               </g>
             </svg>
 
-            {/* 標題區 */}
             <div className="text-center mb-2 mt-0">
               <div className="flex items-baseline justify-center gap-3">
                 <h1 className="text-[2.6rem] text-[#5D4B41] leading-none font-bold" style={{ fontFamily: "'Dancing Script', cursive" }}>
@@ -239,7 +269,6 @@
               </div>
             </div>
 
-            {/* 星期標頭 */}
             <div className="grid grid-cols-7 gap-1 text-center text-[13px] font-bold tracking-widest text-[#A89B90] mb-2">
               <div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div>
               <div className="text-[#D58C92]">SAT</div><div className="text-[#D58C92]">SUN</div>
@@ -247,7 +276,6 @@
             
             <div className="border-b-[1.5px] border-[#e0d6cd]/70 mb-2"></div>
 
-            {/* 日期網格 */}
             <div className="grid grid-cols-7 gap-y-1.5 gap-x-1 flex-grow content-start">
               {Array.from({ length: startingEmptySlots }).map((_, index) => (
                 <div key={`empty-${index}`} className="h-[34px]"></div>
@@ -287,7 +315,6 @@
               })}
             </div>
 
-            {/* 底部圖例說明區 */}
             <div className="mt-4 pt-3 relative">
               <div className="absolute top-0 left-2 right-2 border-t-[1.5px] border-dashed border-[#e0d6cd]/80"></div>
               <div className="flex justify-center gap-5 items-center pt-1">
@@ -311,10 +338,9 @@
             
           </div>
 
-          {/* 管理員專屬提示文字 */}
           {!isReadOnly && (
             <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm">
-              ✨ 您目前身處管理員編輯模式（所有點擊會即時自動同步到雲端）
+              ✨ 管理員編輯模式（點擊即時自動儲存）
             </div>
           )}
 
