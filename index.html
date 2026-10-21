@@ -15,6 +15,7 @@
 <body>
   <div id="root"></div>
 
+  <!-- 雲端即時同步核心引擎 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -22,7 +23,7 @@
 
     async function initFirebase() {
         try {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-shared-v1';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-shared-v3';
             const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
             const config = JSON.parse(configStr);
             
@@ -40,7 +41,7 @@
             if (token) await signInWithCustomToken(auth, token);
             else await signInAnonymously(auth);
 
-            // FIX: Ensure even number of segments for Firestore path (collection -> document -> collection -> document)
+            // 確保路徑完全正確 (使用 publicData)
             window.fbStore = { db, auth, appId, doc, setDoc, onSnapshot, getDoc };
             window.fbStoreReady = true;
             window.dispatchEvent(new Event('firebase-ready'));
@@ -64,16 +65,17 @@
     );
 
     function ReservationCalendar() {
-      const [currentDate, setCurrentDate] = useState(new Date()); 
-      const [dayStatuses, setDayStatuses] = useState({});
-      const [isReadOnly, setIsReadOnly] = useState(true); 
-      const [isDataLoaded, setIsDataLoaded] = useState(false);
-
-      // 動態限制 3 個月範圍 (當月、下個月、下下個月)
+      // 動態計算 3 個月範圍 (當月、下個月、下下個月)
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
       const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
 
+      const [currentDate, setCurrentDate] = useState(minAllowedDate); 
+      const [dayStatuses, setDayStatuses] = useState({});
+      const [isReadOnly, setIsReadOnly] = useState(true); 
+      const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+      // 檢查網址是否有 ?admin=true 暗號
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin') === 'true') {
@@ -83,7 +85,7 @@
         }
       }, []);
 
-      // 網頁載入時，從雲端抓取「共用同步紀錄」
+      // 雲端即時同步監聽
       useEffect(() => {
           let unsubscribe = null;
           const setupSync = () => {
@@ -97,7 +99,6 @@
               }
 
               const { db, appId, doc, onSnapshot } = window.fbStore;
-              // 修正 Firestore 路徑：artifacts/{appId}/publicData/sharedCalendarData (確保偶數段落)
               const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
               
               unsubscribe = onSnapshot(docRef, (snapshot) => {
@@ -149,7 +150,7 @@
       };
 
       const toggleDayStatus = (dateKey) => {
-        if (isReadOnly) return; 
+        if (isReadOnly) return; // 如果是顧客模式，禁止點擊修改
 
         setDayStatuses(prev => {
           const currentStatus = prev[dateKey];
@@ -161,9 +162,10 @@
           
           const newStatuses = { ...prev, [dateKey]: nextStatus };
           
+          // 儲存至本機備份
           localStorage.setItem('ambo_calendar_fallback', JSON.stringify(newStatuses));
 
-          // 即時同步存入雲端共用資料庫
+          // 即時寫入雲端大倉庫，讓所有裝置瞬間同步
           if (window.fbStore) {
               const { db, appId, doc, setDoc } = window.fbStore;
               const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
@@ -210,7 +212,7 @@
             </button>
 
             <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90]">
-              {isReadOnly ? "✦ 預約狀況檢視 (3個月內) ✦" : "✦ 管理員編輯模式 ✦"}
+              {isReadOnly ? "✦ 預約狀況檢視 (3個月內) ✦" : "✦ 管理員編輯模式 (全網同步) ✦"}
             </div>
 
             <button 
@@ -333,7 +335,7 @@
 
           {!isReadOnly && (
             <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm">
-              ✨ 管理員編輯模式（電腦與手機全網即時同步）
+              ✨ 管理員即時編輯模式（電腦與手機全網同步中）
             </div>
           )}
 
