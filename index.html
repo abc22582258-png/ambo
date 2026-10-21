@@ -15,15 +15,15 @@
 <body>
   <div id="root"></div>
 
-  <!-- 雲端即時同步核心引擎 -->
+  <!-- 雲端即時與手動同步核心引擎 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     async function initFirebase() {
         try {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-shared-v3';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-shared-v4';
             const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
             const config = JSON.parse(configStr);
             
@@ -41,8 +41,7 @@
             if (token) await signInWithCustomToken(auth, token);
             else await signInAnonymously(auth);
 
-            // 確保路徑完全正確 (使用 publicData)
-            window.fbStore = { db, auth, appId, doc, setDoc, onSnapshot, getDoc };
+            window.fbStore = { db, auth, appId, doc, setDoc, getDoc, onSnapshot };
             window.fbStoreReady = true;
             window.dispatchEvent(new Event('firebase-ready'));
         } catch (e) { 
@@ -74,6 +73,7 @@
       const [dayStatuses, setDayStatuses] = useState({});
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [isDataLoaded, setIsDataLoaded] = useState(false);
+      const [savingStatus, setSavingStatus] = useState(''); // 用於顯示「儲存中 / 儲存成功」
 
       // 檢查網址是否有 ?admin=true 暗號
       useEffect(() => {
@@ -85,7 +85,7 @@
         }
       }, []);
 
-      // 雲端即時同步監聽
+      // 雲端資料讀取與即時監聽
       useEffect(() => {
           let unsubscribe = null;
           const setupSync = () => {
@@ -101,6 +101,7 @@
               const { db, appId, doc, onSnapshot } = window.fbStore;
               const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
               
+              // 建立即時監聽
               unsubscribe = onSnapshot(docRef, (snapshot) => {
                   if (snapshot.exists()) {
                       const data = snapshot.data().statuses || {};
@@ -161,19 +162,33 @@
           else nextStatus = 'available'; 
           
           const newStatuses = { ...prev, [dateKey]: nextStatus };
-          
-          // 儲存至本機備份
           localStorage.setItem('ambo_calendar_fallback', JSON.stringify(newStatuses));
-
-          // 即時寫入雲端大倉庫，讓所有裝置瞬間同步
-          if (window.fbStore) {
-              const { db, appId, doc, setDoc } = window.fbStore;
-              const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
-              setDoc(docRef, { statuses: newStatuses }, { merge: true }).catch(e => console.error("雲端存檔失敗:", e));
-          }
-          
           return newStatuses;
         });
+      };
+
+      // 手動儲存至雲端按鈕功能
+      const handleSaveToCloud = async () => {
+        if (isReadOnly) return;
+        setSavingStatus('儲存中...');
+
+        try {
+          if (!window.fbStore) {
+            throw new Error("雲端資料庫尚未準備就緒");
+          }
+
+          const { db, appId, doc, setDoc } = window.fbStore;
+          const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
+          
+          await setDoc(docRef, { statuses: dayStatuses, updatedAt: new Date().toISOString() }, { merge: true });
+          
+          setSavingStatus('✨ 儲存成功！全網已同步');
+          setTimeout(() => setSavingStatus(''), 3000);
+        } catch (e) {
+          console.error("雲端存檔發生錯誤:", e);
+          setSavingStatus('❌ 儲存失敗，請檢查網路');
+          setTimeout(() => setSavingStatus(''), 4000);
+        }
       };
 
       const year = currentDate.getFullYear();
@@ -198,7 +213,7 @@
         }}>
           
           {/* 上方泡泡導覽列 */}
-          <div className="w-full max-w-[400px] h-[44px] mb-[39px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
+          <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
             
             <button 
@@ -212,7 +227,7 @@
             </button>
 
             <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90]">
-              {isReadOnly ? "✦ 預約狀況檢視 (3個月內) ✦" : "✦ 管理員編輯模式 (全網同步) ✦"}
+              {isReadOnly ? "✦ 預約狀況檢視 (3個月內) ✦" : "✦ 管理員編輯模式 ✦"}
             </div>
 
             <button 
@@ -333,9 +348,26 @@
             
           </div>
 
+          {/* 管理員專屬：手動儲存按鈕列 */}
           {!isReadOnly && (
+            <div className="mt-4 w-full max-w-[400px] flex flex-col items-center gap-2">
+              <button 
+                onClick={handleSaveToCloud}
+                className="w-full py-3 bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2] font-bold rounded-2xl shadow-md transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2 text-[15px]"
+              >
+                <span>💾 立即儲存並同步至全網</span>
+              </button>
+              {savingStatus && (
+                <div className="text-[13px] font-bold text-[#5D4B41] bg-[#F8F6F2] px-4 py-1.5 rounded-full shadow-sm animate-pulse">
+                  {savingStatus}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isReadOnly && (
             <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm">
-              ✨ 管理員即時編輯模式（電腦與手機全網同步中）
+              ✦ 訪客瀏覽模式（僅限檢視未來三個月） ✦
             </div>
           )}
 
