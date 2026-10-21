@@ -38,12 +38,14 @@
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         
+        // 透過網址有沒有帶 admin=true 來決定能不能編輯
         if (urlParams.get('admin') === 'true') {
           setIsReadOnly(false); 
         } else {
           setIsReadOnly(true);  
         }
 
+        // 從網址讀取排班資料
         const encodedData = urlParams.get('data');
         if (encodedData) {
           try {
@@ -79,7 +81,7 @@
       };
 
       const toggleDayStatus = (dateKey) => {
-        if (isReadOnly) return; 
+        if (isReadOnly) return; // 唯讀模式不能點擊
 
         setDayStatuses(prev => {
           const currentStatus = prev[dateKey];
@@ -93,6 +95,7 @@
         });
       };
 
+      // 產生包含所有排班狀態的專屬網址
       const handleGenerateShareLink = () => {
         try {
           const jsonString = JSON.stringify(dayStatuses);
