@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>專屬預約表</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-sca>lable=no">
+  <title專屬預約表</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -38,7 +38,7 @@
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
 
-      // 使用全網通用的公開 JSON 雲端通道，確保手機與電腦、任何瀏覽器即時同步！
+      // 使用公開雲端 API 通道確保跨裝置即時同步
       const CLOUD_STORAGE_URL = "https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225/latest";
 
       useEffect(() => {
@@ -56,8 +56,8 @@
       const loadCloudData = async () => {
         try {
           setSyncStatus("同步中...");
-          // 先抓取本地快取確保秒開
-          const localData = localStorage.getItem("ambo_calendar_shared_v2");
+          // 先載入本地快取確保秒開
+          const localData = localStorage.getItem("ambo_calendar_shared_v3");
           if (localData) {
             setDayStatuses(JSON.parse(localData));
           }
@@ -68,7 +68,7 @@
             const data = await res.json();
             if (data && data.record) {
               setDayStatuses(data.record);
-              localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(data.record));
+              localStorage.setItem("ambo_calendar_shared_v3", JSON.stringify(data.record));
             }
           }
           setSyncStatus("✨ 已同步");
@@ -111,7 +111,7 @@
           else nextStatus = 'available'; 
           
           const updated = { ...prev, [dateKey]: nextStatus };
-          localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(updated));
+          localStorage.setItem("ambo_calendar_shared_v3", JSON.stringify(updated));
           return updated;
         });
       };
@@ -123,10 +123,9 @@
         setSyncStatus("儲存中...");
         
         try {
-          // 儲存到本地
-          localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(dayStatuses));
+          localStorage.setItem("ambo_calendar_shared_v3", JSON.stringify(dayStatuses));
           
-          // 嘗試上傳到雲端 (支援無伺服器直接同步)
+          // 上傳到雲端伺服器
           await fetch("https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225", {
             method: "PUT",
             headers: {
@@ -134,14 +133,14 @@
               "X-Master-Key": "$2a$10$7XvW7q8..."
             },
             body: JSON.stringify(dayStatuses)
-          }).catch(() => {});
+          });
 
           setIsSaving(false);
           setSyncStatus("✨ 儲存成功！全網已同步");
           setTimeout(() => setSyncStatus("✨ 已同步"), 3000);
         } catch(err) {
           setIsSaving(false);
-          setSyncStatus("✨ 已儲存至本機");
+          setSyncStatus("✨ 儲存成功 (本機)");
         }
       };
 
@@ -329,24 +328,24 @@
             </div>
           )}
 
-          {/* 訪客模式提示 */}
+          {/* 訪客模式隱藏登入觸發點 */}
           {isReadOnly && (
-            <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm cursor-pointer"
+            <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/50 hover:bg-[#F8F6F2] rounded-full text-[#A89B90] hover:text-[#5D4B41] text-[11px] font-bold tracking-widest transition-all cursor-pointer shadow-sm"
                  onClick={() => setShowLoginModal(true)}>
-              ✦ 訪客瀏覽模式（點此登入管理員） ✦
+              ✦ 訪客瀏覽模式 ✦
             </div>
           )}
 
-          {/* 管理員密碼輸入彈跳視窗 (預設密碼 1688) */}
+          {/* 管理員密碼輸入彈跳視窗 (畫面完全不公開顯示密碼) */}
           {showLoginModal && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[320px] shadow-xl flex flex-col items-center">
                 <h3 className="text-[18px] font-bold text-[#5D4B41] mb-2">🔐 管理員登入</h3>
-                <p className="text-[12px] text-[#A89B90] mb-4 text-center">預設管理員密碼為：1688</p>
+                <p className="text-[12px] text-[#A89B90] mb-4 text-center">請輸入管理員解鎖密碼</p>
                 <form onSubmit={handleAdminLogin} className="w-full flex flex-col gap-3">
                   <input 
                     type="password" 
-                    placeholder="請輸入密碼 (1688)" 
+                    placeholder="請輸入管理員密碼" 
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     autoFocus
