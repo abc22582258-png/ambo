@@ -26,9 +26,10 @@
     );
 
     function ReservationCalendar() {
+      // 取得當前真實系統時間的年月作為起始點（例如 2026年10月）
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1); // 最多看未來兩個月
 
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
@@ -38,7 +39,7 @@
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
 
-      // 直接內建你的 Google 試算表網頁應用程式網址
+      // 你的 Google 試算表網頁應用程式網址（已內建綁定）
       const scriptUrl = "https://script.google.com/macros/s/AKfycbwuJQ2zE-8YRxbZdxtVhgW02SJuhQwtYIVu-B73Ic46EwgJ4FcCCELafHT5RvxA-KiIbw/exec";
 
       useEffect(() => {
@@ -60,14 +61,12 @@
       const fetchDataFromSheets = async (url) => {
         if (!url) return;
         try {
-          // 透過加上時間戳參數避免瀏覽器快取，確保拿到最新資料
           const res = await fetch(`${url}?t=${Date.now()}`);
           const text = await res.text();
           let data;
           try {
             data = JSON.parse(text);
           } catch(err) {
-            // 如果回傳的是 Google 重新導向的 HTML 或其他內容
             return;
           }
           if (data && data.statuses) {
@@ -93,7 +92,7 @@
 
       const handlePrevMonth = () => {
         const target = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        if (target < minAllowedDate) return;
+        if (target < minAllowedDate) return; 
         setCurrentDate(target);
       };
 
@@ -123,7 +122,7 @@
         if (!scriptUrl) return;
 
         setIsSaving(true);
-        setSyncStatus("儲存中...");
+        setSyncStatus("⏳ 儲存中...");
         
         try {
           await fetch(scriptUrl, {
@@ -134,8 +133,9 @@
           });
 
           setIsSaving(false);
-          setSyncStatus("✨ 儲存成功！全網已同步");
-          setTimeout(() => setSyncStatus("✨ 已同步"), 3000);
+          setSyncStatus("🎉 儲存成功！全網已同步");
+          // 3秒後恢復正常同步提示
+          setTimeout(() => setSyncStatus("✨ 已同步"), 4000);
         } catch(err) {
           setIsSaving(false);
           setSyncStatus("⚠️ 儲存失敗，請檢查網路");
@@ -175,6 +175,7 @@
           backgroundPosition: "calc(50% + 6px) center" 
         }}>
           
+          {/* 上方導覽列（加入即時狀態提示文字） */}
           <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
             
@@ -190,7 +191,7 @@
 
             <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-2"
                  onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
-              {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 ✦`}
+              {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
 
             <button 
@@ -204,6 +205,7 @@
             </button>
           </div>
 
+          {/* 日曆卡片主體 */}
           <div className="w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col">
             
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 text-[8px] font-medium tracking-[0.15em] text-[#A89B90] pointer-events-none">
@@ -307,14 +309,19 @@
             
           </div>
 
+          {/* 管理員儲存按鈕（加入明顯的動態提示） */}
           {!isReadOnly && (
             <div className="mt-4 w-full max-w-[400px] flex flex-col gap-2">
               <button 
                 onClick={handleManualSave}
                 disabled={isSaving}
-                className="w-full py-3 bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2] font-bold rounded-2xl shadow-md transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2 text-[15px]"
+                className={`w-full py-3.5 font-bold rounded-2xl shadow-md transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2 text-[15px] ${
+                  syncStatus.includes("成功") 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2]'
+                }`}
               >
-                <span>💾 儲存並同步至 Google 試算表</span>
+                <span>{syncStatus.includes("成功") ? "🎉 儲存成功！全網已同步" : "💾 立即儲存並同步至 Google 試算表"}</span>
               </button>
             </div>
           )}
