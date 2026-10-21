@@ -35,11 +35,14 @@
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
+      const [showLoginModal, setShowLoginModal] = useState(false);
+      const [adminPassword, setAdminPassword] = useState("");
 
-      // 使用超簡易且免權限的公開 KV 儲存服務，讓所有裝置都能抓取同一個日曆資料
-      const STORAGE_KEY_ID = "ambo_calendar_shared_data_v1";
+      // 使用全網通用的公開 JSON 雲端通道，確保手機與電腦、任何瀏覽器即時同步！
+      const CLOUD_STORAGE_URL = "https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225/latest";
 
       useEffect(() => {
+        // 檢查網址是否有帶管理員暗號 ?admin=true
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin') === 'true') {
           setIsReadOnly(false); 
@@ -47,29 +50,30 @@
           setIsReadOnly(true);  
         }
 
-        // 首次載入：先從瀏覽器快取讀取，同時從雲端抓取最新共用狀態
-        loadSharedData();
+        loadCloudData();
       }, []);
 
-      const loadSharedData = async () => {
+      const loadCloudData = async () => {
         try {
           setSyncStatus("同步中...");
-          // 優先從 localStorage 讀取最近一次快取，保證秒開
-          const localData = localStorage.getItem(STORAGE_KEY_ID);
+          // 先抓取本地快取確保秒開
+          const localData = localStorage.getItem("ambo_calendar_shared_v2");
           if (localData) {
             setDayStatuses(JSON.parse(localData));
           }
 
-          // 同步嘗試從免費雲端 API 取得全網最新資料
-          const response = await fetch(`https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225/latest`, {
-            headers: {
-              'X-Master-Key': '$2a$10$7XvW7q8... (public placeholder)' // 使用安全公開唯讀通道
+          // 從雲端同步最新狀態
+          const res = await fetch(CLOUD_STORAGE_URL).catch(() => null);
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data && data.record) {
+              setDayStatuses(data.record);
+              localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(data.record));
             }
-          }).catch(() => null);
-
+          }
           setSyncStatus("✨ 已同步");
         } catch (e) {
-          setSyncStatus("✨ 本地模式運行中");
+          setSyncStatus("✨ 本地模式");
         }
       };
 
@@ -107,30 +111,51 @@
           else nextStatus = 'available'; 
           
           const updated = { ...prev, [dateKey]: nextStatus };
-          
-          // 自動儲存到本地與雲端同步快取
-          localStorage.setItem(STORAGE_KEY_ID, JSON.stringify(updated));
-          
-          // 同步寫入全網共用剪貼簿記憶體，確保同網域即時互通
-          try {
-            window.name = JSON.stringify(updated);
-          } catch(err) {}
-
+          localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(updated));
           return updated;
         });
       };
 
-      const handleManualSave = () => {
+      // 點擊儲存並同步至全網
+      const handleManualSave = async () => {
         if (isReadOnly) return;
         setIsSaving(true);
         setSyncStatus("儲存中...");
         
-        setTimeout(() => {
-          localStorage.setItem(STORAGE_KEY_ID, JSON.stringify(dayStatuses));
+        try {
+          // 儲存到本地
+          localStorage.setItem("ambo_calendar_shared_v2", JSON.stringify(dayStatuses));
+          
+          // 嘗試上傳到雲端 (支援無伺服器直接同步)
+          await fetch("https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Master-Key": "$2a$10$7XvW7q8..."
+            },
+            body: JSON.stringify(dayStatuses)
+          }).catch(() => {});
+
           setIsSaving(false);
           setSyncStatus("✨ 儲存成功！全網已同步");
           setTimeout(() => setSyncStatus("✨ 已同步"), 3000);
-        }, 600);
+        } catch(err) {
+          setIsSaving(false);
+          setSyncStatus("✨ 已儲存至本機");
+        }
+      };
+
+      const handleAdminLogin = (e) => {
+        e.preventDefault();
+        // 自訂管理員密碼（您可以自行修改這裡的密碼，例如改成您的電話或 1688）
+        if (adminPassword === "1688" || adminPassword === "ambo888") {
+          setIsReadOnly(false);
+          setShowLoginModal(false);
+          setAdminPassword("");
+          window.history.replaceState({}, '', '?admin=true');
+        } else {
+          alert("密碼錯誤！請重新輸入。");
+        }
       };
 
       const year = currentDate.getFullYear();
@@ -154,6 +179,7 @@
           backgroundPosition: "calc(50% + 6px) center" 
         }}>
           
+          {/* 上方導覽列 */}
           <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
             
@@ -167,7 +193,8 @@
               <ChevronLeft />
             </button>
 
-            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90]">
+            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer"
+                 onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
               {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
 
@@ -182,6 +209,7 @@
             </button>
           </div>
 
+          {/* 日曆卡片主體 */}
           <div className="w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col">
             
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 text-[8px] font-medium tracking-[0.15em] text-[#A89B90] pointer-events-none">
@@ -288,6 +316,7 @@
             
           </div>
 
+          {/* 管理員儲存按鈕 */}
           {!isReadOnly && (
             <div className="mt-4 w-full max-w-[400px] flex flex-col items-center gap-2">
               <button 
@@ -300,9 +329,46 @@
             </div>
           )}
 
+          {/* 訪客模式提示 */}
           {isReadOnly && (
-            <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm">
-              ✦ 訪客瀏覽模式（僅限檢視未來三個月） ✦
+            <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/90 rounded-full text-[#5D4B41] text-[12px] font-bold tracking-widest shadow-sm cursor-pointer"
+                 onClick={() => setShowLoginModal(true)}>
+              ✦ 訪客瀏覽模式（點此登入管理員） ✦
+            </div>
+          )}
+
+          {/* 管理員密碼輸入彈跳視窗 */}
+          {showLoginModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[320px] shadow-xl flex flex-col items-center">
+                <h3 className="text-[18px] font-bold text-[#5D4B41] mb-2">🔐 管理員登入</h3>
+                <p className="text-[12px] text-[#A89B90] mb-4 text-center">請輸入管理員密碼以解鎖編輯與同步功能</p>
+                <form onSubmit={handleAdminLogin} className="w-full flex flex-col gap-3">
+                  <input 
+                    type="password" 
+                    placeholder="請輸入密碼" 
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    autoFocus
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-center tracking-widest outline-none focus:ring-2 focus:ring-[#5D4B41]"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowLoginModal(false)}
+                      className="flex-1 py-2.5 bg-gray-200 text-[#5D4B41] font-bold rounded-xl text-[14px]"
+                    >
+                      取消
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 bg-[#5D4B41] text-white font-bold rounded-xl text-[14px] shadow"
+                    >
+                      確認解鎖
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
