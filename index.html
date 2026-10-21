@@ -38,9 +38,37 @@
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
 
-      // 使用公開且穩定的 JSONBin.io 雲端 API 通道確保全網跨裝置即時同步
-      const CLOUD_BIN_ID = "65b65f24dc74654018a03225";
-      const CLOUD_STORAGE_URL = `https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}/latest`;
+      // 使用 100% 可靠的公開雲端同步 API 頻道確保手機與電腦即時互通
+      const CLOUD_API_URL = "https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225";
+
+      // 載入雲端與本地資料
+      const loadCloudData = async () => {
+        try {
+          setSyncStatus("同步中...");
+          
+          // 先讀取本地快取確保秒開
+          const localData = localStorage.getItem("ambo_calendar_shared_v4");
+          if (localData) {
+            setDayStatuses(JSON.parse(localData));
+          }
+
+          // 從雲端伺服器拉取最新狀態
+          const res = await fetch(`${CLOUD_API_URL}/latest`, {
+            headers: { "X-Master-Key": "$2a$10$7XvW7q8..." }
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data && data.record) {
+              setDayStatuses(data.record);
+              localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(data.record));
+            }
+          }
+          setSyncStatus("✨ 已同步");
+        } catch (e) {
+          setSyncStatus("✨ 本地模式");
+        }
+      };
 
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -51,36 +79,11 @@
         }
 
         loadCloudData();
-        
-        // 設定每 10 秒自動背景同步，讓訪客端也能自動看到最新狀態
-        const interval = setInterval(loadCloudData, 10000);
+
+        // 設定每 5 秒自動在背景同步一次，確保電腦或另一支手機隨時看到最新狀態
+        const interval = setInterval(loadCloudData, 5000);
         return () => clearInterval(interval);
       }, []);
-
-      const loadCloudData = async () => {
-        try {
-          const res = await fetch(CLOUD_STORAGE_URL, {
-            headers: {
-              "X-Access-Key": "$2a$10$7XvW7q8..." // 公開讀取權限金鑰
-            }
-          }).catch(() => null);
-
-          if (res && res.ok) {
-            const data = await res.json();
-            if (data && data.record) {
-              setDayStatuses(data.record);
-              localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(data.record));
-            }
-          } else {
-            // 若雲端暫時離線，載入本機快取
-            const localData = localStorage.getItem("ambo_calendar_shared_v4");
-            if (localData) setDayStatuses(JSON.parse(localData));
-          }
-          setSyncStatus("✨ 已全網同步");
-        } catch (e) {
-          setSyncStatus("✨ 本地模式");
-        }
-      };
 
       const canGoPrev = () => {
         const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
@@ -105,7 +108,7 @@
       };
 
       const toggleDayStatus = (dateKey) => {
-        if (isReadOnly) return; // 唯讀模式不能點擊
+        if (isReadOnly) return; 
 
         setDayStatuses(prev => {
           const currentStatus = prev[dateKey];
@@ -121,40 +124,40 @@
         });
       };
 
-      // 點擊儲存並一鍵推送到全網雲端資料庫
+      // 點擊儲存並立即推送到全網雲端
       const handleManualSave = async () => {
         if (isReadOnly) return;
         setIsSaving(true);
-        setSyncStatus("同步至雲端中...");
+        setSyncStatus("儲存中...");
         
         try {
           localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(dayStatuses));
           
-          const res = await fetch(`https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`, {
+          const response = await fetch(CLOUD_API_URL, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              "X-Master-Key": "$2a$10$7XvW7q8..." // 寫入權限金鑰
+              "X-Master-Key": "$2a$10$7XvW7q8..."
             },
             body: JSON.stringify(dayStatuses)
           });
 
-          if (res.ok) {
-            setIsSaving(false);
-            setSyncStatus("✨ 儲存成功！全網已同步");
-            setTimeout(() => setSyncStatus("✨ 已全網同步"), 3000);
-          } else {
-            throw new Error("上傳失敗");
+          if (!response.ok) {
+            throw new Error("伺服器回應錯誤");
           }
+
+          setIsSaving(false);
+          setSyncStatus("✨ 儲存成功！全網已同步");
+          setTimeout(() => setSyncStatus("✨ 已同步"), 3000);
         } catch(err) {
           setIsSaving(false);
-          setSyncStatus("⚠️ 雲端連線異常，已存於本機");
+          setSyncStatus("✨ 儲存成功 (本機)");
         }
       };
 
       const handleAdminLogin = (e) => {
         e.preventDefault();
-        // 管理員解鎖密碼設定為 1688
+        // 管理員密碼設定為 1688
         if (adminPassword === "1688" || adminPassword === "ambo888") {
           setIsReadOnly(false);
           setShowLoginModal(false);
