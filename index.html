@@ -147,7 +147,7 @@
 
       const handleAdminLogin = (e) => {
         e.preventDefault();
-        // 自訂管理員密碼（您可以自行修改這裡的密碼，例如改成您的電話或 1688）
+        // 管理員密碼設定為 1688
         if (adminPassword === "1688" || adminPassword === "ambo888") {
           setIsReadOnly(false);
           setShowLoginModal(false);
@@ -337,16 +337,16 @@
             </div>
           )}
 
-          {/* 管理員密碼輸入彈跳視窗 */}
+          {/* 管理員密碼輸入彈跳視窗 (預設密碼 1688) */}
           {showLoginModal && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[320px] shadow-xl flex flex-col items-center">
                 <h3 className="text-[18px] font-bold text-[#5D4B41] mb-2">🔐 管理員登入</h3>
-                <p className="text-[12px] text-[#A89B90] mb-4 text-center">請輸入管理員密碼以解鎖編輯與同步功能</p>
+                <p className="text-[12px] text-[#A89B90] mb-4 text-center">預設管理員密碼為：1688</p>
                 <form onSubmit={handleAdminLogin} className="w-full flex flex-col gap-3">
                   <input 
                     type="password" 
-                    placeholder="請輸入密碼" 
+                    placeholder="請輸入密碼 (1688)" 
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     autoFocus
