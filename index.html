@@ -26,6 +26,7 @@
     );
 
     function ReservationCalendar() {
+      // 限制只能看當前月份與未來 2 個月
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
       const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
@@ -33,57 +34,50 @@
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
       const [isReadOnly, setIsReadOnly] = useState(true); 
-      const [syncStatus, setSyncStatus] = useState("連線中...");
+      const [syncStatus, setSyncStatus] = useState("請設定 Google 試算表連結");
       const [isSaving, setIsSaving] = useState(false);
+      const [showConfigModal, setShowConfigModal] = useState(false);
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
-
-      // 使用 100% 可靠的公開雲端同步 API 頻道確保手機與電腦即時互通
-      const CLOUD_API_URL = "https://api.jsonbin.io/v3/b/65b65f24dc74654018a03225";
-
-      // 載入雲端與本地資料
-      const loadCloudData = async () => {
-        try {
-          setSyncStatus("同步中...");
-          
-          // 先讀取本地快取確保秒開
-          const localData = localStorage.getItem("ambo_calendar_shared_v4");
-          if (localData) {
-            setDayStatuses(JSON.parse(localData));
-          }
-
-          // 從雲端伺服器拉取最新狀態
-          const res = await fetch(`${CLOUD_API_URL}/latest`, {
-            headers: { "X-Master-Key": "$2a$10$7XvW7q8..." }
-          }).catch(() => null);
-
-          if (res && res.ok) {
-            const data = await res.json();
-            if (data && data.record) {
-              setDayStatuses(data.record);
-              localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(data.record));
-            }
-          }
-          setSyncStatus("✨ 已同步");
-        } catch (e) {
-          setSyncStatus("✨ 本地模式");
-        }
-      };
+      const [scriptUrl, setScriptUrl] = useState("");
 
       useEffect(() => {
+        // 檢查網址是否有 ?admin=true 暗號，自動切換為管理員模式
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin') === 'true') {
           setIsReadOnly(false); 
-        } else {
-          setIsReadOnly(true);  
         }
 
-        loadCloudData();
-
-        // 設定每 5 秒自動在背景同步一次，確保電腦或另一支手機隨時看到最新狀態
-        const interval = setInterval(loadCloudData, 5000);
-        return () => clearInterval(interval);
+        // 自動讀取之前存在瀏覽器裡的 Google 試算表網址
+        const savedUrl = localStorage.getItem("ambo_sheets_script_url");
+        if (savedUrl) {
+          setScriptUrl(savedUrl);
+          fetchDataFromSheets(savedUrl);
+        } else {
+          // 如果沒有設定過，自動跳出設定引導
+          if (!urlParams.get('admin')) {
+            // 訪客預設唯讀
+          }
+        }
       }, []);
+
+      // 從 Google 試算表讀取資料
+      const fetchDataFromSheets = async (url) => {
+        if (!url) return;
+        try {
+          setSyncStatus("同步中...");
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data && data.statuses) {
+            setDayStatuses(data.statuses);
+            setSyncStatus("✨ 已同步");
+          } else {
+            setSyncStatus("✨ 尚無排班資料");
+          }
+        } catch (e) {
+          setSyncStatus("⚠️ 連線試算表失敗");
+        }
+      };
 
       const canGoPrev = () => {
         const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
@@ -108,7 +102,7 @@
       };
 
       const toggleDayStatus = (dateKey) => {
-        if (isReadOnly) return; 
+        if (isReadOnly) return; // 唯讀模式下不能點擊修改
 
         setDayStatuses(prev => {
           const currentStatus = prev[dateKey];
@@ -118,54 +112,58 @@
           else if (currentStatus === 'full') nextStatus = 'off'; 
           else nextStatus = 'available'; 
           
-          const updated = { ...prev, [dateKey]: nextStatus };
-          localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(updated));
-          return updated;
+          return { ...prev, [dateKey]: nextStatus };
         });
       };
 
-      // 點擊儲存並立即推送到全網雲端
+      // 儲存並寫入 Google 試算表
       const handleManualSave = async () => {
         if (isReadOnly) return;
+        if (!scriptUrl) {
+          setShowConfigModal(true);
+          return;
+        }
+
         setIsSaving(true);
         setSyncStatus("儲存中...");
         
         try {
-          localStorage.setItem("ambo_calendar_shared_v4", JSON.stringify(dayStatuses));
-          
-          const response = await fetch(CLOUD_API_URL, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Master-Key": "$2a$10$7XvW7q8..."
-            },
-            body: JSON.stringify(dayStatuses)
+          // 使用 no-cors 避免跨域阻擋，並將資料POST到 Google Apps Script
+          await fetch(scriptUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ statuses: dayStatuses })
           });
-
-          if (!response.ok) {
-            throw new Error("伺服器回應錯誤");
-          }
 
           setIsSaving(false);
           setSyncStatus("✨ 儲存成功！全網已同步");
           setTimeout(() => setSyncStatus("✨ 已同步"), 3000);
         } catch(err) {
           setIsSaving(false);
-          setSyncStatus("✨ 儲存成功 (本機)");
+          setSyncStatus("⚠️ 儲存失敗，請檢查網址");
         }
       };
 
       const handleAdminLogin = (e) => {
         e.preventDefault();
-        // 管理員密碼設定為 1688
         if (adminPassword === "1688" || adminPassword === "ambo888") {
           setIsReadOnly(false);
           setShowLoginModal(false);
           setAdminPassword("");
+          // 自動幫網址加上 ?admin=true
           window.history.replaceState({}, '', '?admin=true');
         } else {
           alert("密碼錯誤！請重新輸入。");
         }
+      };
+
+      const saveScriptUrlConfig = (e) => {
+        e.preventDefault();
+        localStorage.setItem("ambo_sheets_script_url", scriptUrl);
+        setShowConfigModal(false);
+        fetchDataFromSheets(scriptUrl);
+        alert("Google 試算表連結設定成功！");
       };
 
       const year = currentDate.getFullYear();
@@ -203,9 +201,9 @@
               <ChevronLeft />
             </button>
 
-            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer"
+            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-2"
                  onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
-              {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
+              {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 ✦`}
             </div>
 
             <button 
@@ -319,48 +317,88 @@
                   <span className="text-[14px] font-bold text-[#5D4B41] tracking-widest">休假</span>
                 </div>
               </div>
-              <svg className="absolute right-1 bottom-1 w-[18px] h-[18px] text-[#CDBEAD]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6"/>
-              </svg>
             </div>
             
           </div>
 
-          {/* 管理員儲存按鈕 */}
+          {/* 管理員控制按鈕列 */}
           {!isReadOnly && (
-            <div className="mt-4 w-full max-w-[400px] flex flex-col items-center gap-2">
+            <div className="mt-4 w-full max-w-[400px] flex flex-col gap-2">
               <button 
                 onClick={handleManualSave}
                 disabled={isSaving}
                 className="w-full py-3 bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2] font-bold rounded-2xl shadow-md transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2 text-[15px]"
               >
-                <span>💾 儲存並同步至所有裝置</span>
+                <span>💾 儲存並同步至 Google 試算表</span>
+              </button>
+              <button 
+                onClick={() => setShowConfigModal(true)}
+                className="w-full py-2 bg-[#F8F6F2] hover:bg-white text-[#5D4B41] font-bold rounded-2xl shadow-sm text-[13px] tracking-widest"
+              >
+                ⚙️ 設定試算表連結網址
               </button>
             </div>
           )}
 
-          {/* 訪客模式隱藏登入觸發點 */}
+          {/* 訪客模式觸發點 */}
           {isReadOnly && (
             <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/50 hover:bg-[#F8F6F2] rounded-full text-[#A89B90] hover:text-[#5D4B41] text-[11px] font-bold tracking-widest transition-all cursor-pointer shadow-sm"
                  onClick={() => setShowLoginModal(true)}>
-              ✦ 訪客瀏覽模式 ✦
+              ✦ 訪客瀏覽模式 (點此登入管理員) ✦
             </div>
           )}
 
-          {/* 管理員密碼輸入彈跳視窗 */}
+          {/* 設定試算表網址彈跳視窗 */}
+          {showConfigModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[340px] shadow-xl flex flex-col items-center">
+                <h3 className="text-[18px] font-bold text-[#5D4B41] mb-2">⚙️ 連結 Google 試算表</h3>
+                <p className="text-[12px] text-[#A89B90] mb-4 text-center leading-relaxed">
+                  請輸入您剛剛從 Google Apps Script 取得的「網頁應用程式網址」：
+                </p>
+                <form onSubmit={saveScriptUrlConfig} className="w-full flex flex-col gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="https://script.google.com/..." 
+                    value={scriptUrl}
+                    onChange={(e) => setScriptUrl(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-[12px] outline-none"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowConfigModal(false)}
+                      className="flex-1 py-2.5 bg-gray-200 text-[#5D4B41] font-bold rounded-xl text-[14px]"
+                    >
+                      取消
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 bg-[#5D4B41] text-white font-bold rounded-xl text-[14px] shadow"
+                    >
+                      儲存設定
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 管理員密碼登入視窗 */}
           {showLoginModal && (
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[320px] shadow-xl flex flex-col items-center">
                 <h3 className="text-[18px] font-bold text-[#5D4B41] mb-2">🔐 管理員登入</h3>
-                <p className="text-[12px] text-[#A89B90] mb-4 text-center">請輸入管理員解鎖密碼</p>
+                <p className="text-[12px] text-[#A89B90] mb-4 text-center">請輸入管理員解鎖密碼 (預設 1688)</p>
                 <form onSubmit={handleAdminLogin} className="w-full flex flex-col gap-3">
                   <input 
                     type="password" 
-                    placeholder="請輸入管理員密碼" 
+                    placeholder="請輸入密碼" 
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     autoFocus
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-center tracking-widest outline-none focus:ring-2 focus:ring-[#5D4B41]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-center tracking-widest outline-none"
                   />
                   <div className="flex gap-2 mt-2">
                     <button 
