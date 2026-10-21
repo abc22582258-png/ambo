@@ -12,46 +12,8 @@
   
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="bg-[#e0d6cd]">
   <div id="root"></div>
-
-  <!-- 雲端即時與手動同步核心引擎 -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    async function initFirebase() {
-        try {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'ambo-art-calendar-shared-v4';
-            const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-            const config = JSON.parse(configStr);
-            
-            if (Object.keys(config).length === 0) {
-                window.fbStoreReady = false;
-                window.dispatchEvent(new Event('firebase-ready'));
-                return;
-            }
-
-            const app = initializeApp(config);
-            const auth = getAuth(app);
-            const db = getFirestore(app);
-
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            if (token) await signInWithCustomToken(auth, token);
-            else await signInAnonymously(auth);
-
-            window.fbStore = { db, auth, appId, doc, setDoc, getDoc, onSnapshot };
-            window.fbStoreReady = true;
-            window.dispatchEvent(new Event('firebase-ready'));
-        } catch (e) { 
-            console.error("雲端存檔啟動失敗:", e); 
-            window.fbStoreReady = false;
-            window.dispatchEvent(new Event('firebase-ready'));
-        }
-    }
-    initFirebase();
-  </script>
 
   <script type="text/babel">
     const { useState, useEffect } = React;
@@ -64,7 +26,6 @@
     );
 
     function ReservationCalendar() {
-      // 動態計算 3 個月範圍 (當月、下個月、下下個月)
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
       const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1);
@@ -72,60 +33,27 @@
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
       const [isReadOnly, setIsReadOnly] = useState(true); 
-      const [isDataLoaded, setIsDataLoaded] = useState(false);
-      const [savingStatus, setSavingStatus] = useState(''); // 用於顯示「儲存中 / 儲存成功」
+      const [copiedStatus, setCopiedStatus] = useState(false);
 
-      // 檢查網址是否有 ?admin=true 暗號
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
+        
         if (urlParams.get('admin') === 'true') {
           setIsReadOnly(false); 
         } else {
           setIsReadOnly(true);  
         }
-      }, []);
 
-      // 雲端資料讀取與即時監聽
-      useEffect(() => {
-          let unsubscribe = null;
-          const setupSync = () => {
-              if (!window.fbStore) {
-                  const localData = localStorage.getItem('ambo_calendar_fallback');
-                  if (localData) {
-                      try { setDayStatuses(JSON.parse(localData)); } catch(e) {}
-                  }
-                  setIsDataLoaded(true);
-                  return;
-              }
-
-              const { db, appId, doc, onSnapshot } = window.fbStore;
-              const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
-              
-              // 建立即時監聽
-              unsubscribe = onSnapshot(docRef, (snapshot) => {
-                  if (snapshot.exists()) {
-                      const data = snapshot.data().statuses || {};
-                      setDayStatuses(data);
-                      localStorage.setItem('ambo_calendar_fallback', JSON.stringify(data));
-                  }
-                  setIsDataLoaded(true);
-              }, (error) => {
-                  console.error("讀取雲端存檔失敗:", error);
-                  const localData = localStorage.getItem('ambo_calendar_fallback');
-                  if (localData) {
-                      try { setDayStatuses(JSON.parse(localData)); } catch(e) {}
-                  }
-                  setIsDataLoaded(true);
-              });
-          };
-
-          if (window.fbStoreReady !== undefined) setupSync();
-          else window.addEventListener('firebase-ready', setupSync);
-
-          return () => {
-              if (unsubscribe) unsubscribe();
-              window.removeEventListener('firebase-ready', setupSync);
-          };
+        const encodedData = urlParams.get('data');
+        if (encodedData) {
+          try {
+            const jsonString = decodeURIComponent(atob(encodedData));
+            const parsedData = JSON.parse(jsonString);
+            setDayStatuses(parsedData);
+          } catch (e) {
+            console.error("解析網址資料失敗:", e);
+          }
+        }
       }, []);
 
       const canGoPrev = () => {
@@ -151,7 +79,7 @@
       };
 
       const toggleDayStatus = (dateKey) => {
-        if (isReadOnly) return; // 如果是顧客模式，禁止點擊修改
+        if (isReadOnly) return; 
 
         setDayStatuses(prev => {
           const currentStatus = prev[dateKey];
@@ -161,33 +89,29 @@
           else if (currentStatus === 'full') nextStatus = 'off'; 
           else nextStatus = 'available'; 
           
-          const newStatuses = { ...prev, [dateKey]: nextStatus };
-          localStorage.setItem('ambo_calendar_fallback', JSON.stringify(newStatuses));
-          return newStatuses;
+          return { ...prev, [dateKey]: nextStatus };
         });
       };
 
-      // 手動儲存至雲端按鈕功能
-      const handleSaveToCloud = async () => {
-        if (isReadOnly) return;
-        setSavingStatus('儲存中...');
-
+      const handleGenerateShareLink = () => {
         try {
-          if (!window.fbStore) {
-            throw new Error("雲端資料庫尚未準備就緒");
-          }
+          const jsonString = JSON.stringify(dayStatuses);
+          const encodedData = btoa(encodeURIComponent(jsonString));
+          
+          const baseUrl = window.location.origin + window.location.pathname;
+          const customerUrl = `${baseUrl}?data=${encodedData}`;
 
-          const { db, appId, doc, setDoc } = window.fbStore;
-          const docRef = doc(db, 'artifacts', appId, 'publicData', 'sharedCalendarData');
-          
-          await setDoc(docRef, { statuses: dayStatuses, updatedAt: new Date().toISOString() }, { merge: true });
-          
-          setSavingStatus('✨ 儲存成功！全網已同步');
-          setTimeout(() => setSavingStatus(''), 3000);
+          const textArea = document.createElement("textarea");
+          textArea.value = customerUrl;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+
+          setCopiedStatus(true);
+          setTimeout(() => setCopiedStatus(false), 3500);
         } catch (e) {
-          console.error("雲端存檔發生錯誤:", e);
-          setSavingStatus('❌ 儲存失敗，請檢查網路');
-          setTimeout(() => setSavingStatus(''), 4000);
+          console.error("產生網址失敗:", e);
         }
       };
 
@@ -212,7 +136,6 @@
           backgroundPosition: "calc(50% + 6px) center" 
         }}>
           
-          {/* 上方泡泡導覽列 */}
           <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
             
@@ -241,7 +164,6 @@
             </button>
           </div>
 
-          {/* 日曆卡片主體 */}
           <div className="w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col">
             
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 text-[8px] font-medium tracking-[0.15em] text-[#A89B90] pointer-events-none">
@@ -348,18 +270,17 @@
             
           </div>
 
-          {/* 管理員專屬：手動儲存按鈕列 */}
           {!isReadOnly && (
             <div className="mt-4 w-full max-w-[400px] flex flex-col items-center gap-2">
               <button 
-                onClick={handleSaveToCloud}
+                onClick={handleGenerateShareLink}
                 className="w-full py-3 bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2] font-bold rounded-2xl shadow-md transition-all active:scale-95 tracking-widest flex items-center justify-center gap-2 text-[15px]"
               >
-                <span>💾 立即儲存並同步至全網</span>
+                <span>🔗 產生並複製最新預約網址給客人</span>
               </button>
-              {savingStatus && (
+              {copiedStatus && (
                 <div className="text-[13px] font-bold text-[#5D4B41] bg-[#F8F6F2] px-4 py-1.5 rounded-full shadow-sm animate-pulse">
-                  {savingStatus}
+                  ✨ 已複製最新網址！直接貼給客人即可同步
                 </div>
               )}
             </div>
