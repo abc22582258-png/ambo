@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>專屬預約表</title>
+  <title>AMBO預約表</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -71,12 +71,12 @@
           }
           if (data && data.statuses) {
             setDayStatuses(data.statuses);
-            setSyncStatus("✨ 已同步");
+            setSyncStatus("✨已同步");
           } else {
             setSyncStatus("✨ 尚無排班資料");
           }
         } catch (e) {
-          setSyncStatus("⚠️ 同步連線中");
+          setSyncStatus("⚠️同步連線中");
         }
       };
 
@@ -122,7 +122,7 @@
         if (!scriptUrl) return;
 
         setIsSaving(true);
-        setSyncStatus("⏳ 儲存中...");
+        setSyncStatus("⏳儲存中...");
         
         try {
           await fetch(scriptUrl, {
@@ -133,12 +133,12 @@
           });
 
           setIsSaving(false);
-          setSyncStatus("🎉 儲存成功！全網已同步");
+          setSyncStatus("🎉儲存成功！全網已同步");
           // 3秒後恢復正常同步提示
-          setTimeout(() => setSyncStatus("✨ 已同步"), 4000);
+          setTimeout(() => setSyncStatus("✨已同步"), 4000);
         } catch(err) {
           setIsSaving(false);
-          setSyncStatus("⚠️ 儲存失敗，請檢查網路");
+          setSyncStatus("⚠️儲存失敗，請檢查網路");
         }
       };
 
@@ -191,7 +191,7 @@
 
             <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-2"
                  onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
-              {isReadOnly ? `✦ 預約狀況 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
+              {isReadOnly ? `✦ 預約狀況/可左右切換月份 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
 
             <button 
