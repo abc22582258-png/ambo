@@ -33,11 +33,19 @@
 
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
+      const [dayNotes, setDayNotes] = useState({}); // 儲存特殊備註
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
+
+      // 備註彈窗狀態 (管理員編輯用)
+      const [activeNoteModal, setActiveNoteModal] = useState(null); // dateKey
+      const [tempNoteText, setTempNoteText] = useState("");
+
+      // 提示氣泡狀態（點擊或hover顯示備註）
+      const [activeTooltip, setActiveTooltip] = useState(null);
 
       // 你的 Google 試算表網頁應用程式網址（已內建綁定）
       const scriptUrl = "https://script.google.com/macros/s/AKfycbwuJQ2zE-8YRxbZdxtVhgW02SJuhQwtYIVu-B73Ic46EwgJ4FcCCELafHT5RvxA-KiIbw/exec";
@@ -69,8 +77,9 @@
           } catch(err) {
             return;
           }
-          if (data && data.statuses) {
-            setDayStatuses(data.statuses);
+          if (data) {
+            if (data.statuses) setDayStatuses(data.statuses);
+            if (data.notes) setDayNotes(data.notes);
             setSyncStatus("✨已同步");
           } else {
             setSyncStatus("✨ 尚無排班資料");
@@ -102,6 +111,25 @@
         setCurrentDate(target);
       };
 
+      const handleCellClick = (e, dateKey) => {
+        e.stopPropagation();
+        const hasNote = !!dayNotes[dateKey];
+
+        if (isReadOnly) {
+          // 訪客模式：若有備註則點擊格子直接切換顯示氣泡
+          if (hasNote) {
+            setActiveTooltip(activeTooltip === dateKey ? null : dateKey);
+          } else {
+            setActiveTooltip(null);
+          }
+          return;
+        }
+
+        // 管理員模式：點擊格子切換狀態
+        // 若同時想在管理員模式也能編輯備註，可以按驚嘆號圖示，點格子則是正常換狀態
+        toggleDayStatus(dateKey);
+      };
+
       const toggleDayStatus = (dateKey) => {
         if (isReadOnly) return;
 
@@ -117,6 +145,34 @@
         });
       };
 
+      const handleOpenNoteModal = (e, dateKey) => {
+        e.stopPropagation(); // 阻止事件冒泡，避免同時觸發換狀態
+        if (isReadOnly) {
+          // 訪客模式點擊驚嘆號也直接展開備註氣泡
+          setActiveTooltip(activeTooltip === dateKey ? null : dateKey);
+          return;
+        }
+        // 管理員模式：打開編輯備註彈窗
+        setActiveNoteModal(dateKey);
+        setTempNoteText(dayNotes[dateKey] || "");
+      };
+
+      const handleSaveNote = () => {
+        if (!activeNoteModal) return;
+        const dateKey = activeNoteModal;
+        setDayNotes(prev => {
+          const updated = { ...prev };
+          if (tempNoteText.trim() === "") {
+            delete updated[dateKey];
+          } else {
+            updated[dateKey] = tempNoteText.trim();
+          }
+          return updated;
+        });
+        setActiveNoteModal(null);
+        setTempNoteText("");
+      };
+
       const handleManualSave = async () => {
         if (isReadOnly) return;
         if (!scriptUrl) return;
@@ -129,7 +185,7 @@
             method: "POST",
             mode: "no-cors",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ statuses: dayStatuses })
+            body: JSON.stringify({ statuses: dayStatuses, notes: dayNotes })
           });
 
           setIsSaving(false);
@@ -167,13 +223,13 @@
       ];
 
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans" style={{ 
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans relative" style={{ 
           fontFamily: "'Quicksand', sans-serif",
           backgroundColor: "#e0d6cd", 
           backgroundImage: "radial-gradient(#bfaea2 1.5px, transparent 1.5px)", 
           backgroundSize: "16px 16px", 
           backgroundPosition: "calc(50% + 6px) center" 
-        }}>
+        }} onClick={() => setActiveTooltip(null)}>
           
           {/* 上方導覽列（加入即時狀態提示文字） */}
           <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
@@ -259,6 +315,7 @@
                 const day = index + 1;
                 const dateKey = `${year}-${month + 1}-${day}`;
                 const status = dayStatuses[dateKey] || 'available';
+                const note = dayNotes[dateKey];
                 
                 // 判斷是否為今天
                 const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
@@ -266,7 +323,8 @@
                 return (
                   <div 
                     key={dateKey} 
-                    onClick={() => toggleDayStatus(dateKey)}
+                    onClick={(e) => handleCellClick(e, dateKey)}
+                    onMouseEnter={() => { if(note && isReadOnly) setActiveTooltip(dateKey); }}
                     className={`flex flex-col items-center justify-center group h-[34px] relative ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -282,37 +340,75 @@
                              style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%", transform: "rotate(3deg)" }}></div>
                       )}
                     </div>
+
                     <span className={`text-[13px] font-bold z-10 transition-colors relative ${
                       status === 'off' || status === 'full' ? 'text-white' : 'text-[#5D4B41]'
                     }`}>
                       {day}
-                      {/* 今日導引：右上與左下加上奶白黃色閃光星芒，帶超級細微柔和的邊界感 */}
+                      {/* 今日導引：右上與左下加上奶白黃色閃光星芒 */}
                       {isToday && (
-                        <span className="absolute -top-1.5 -right-2.5 text-[11px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 #8C7A6B, 0.5px -0.5px 0 #8C7A6B, -0.5px 0.5px 0 #8C7A6B, 0.5px 0.5px 0 #8C7A6B" }}>✦</span>
+                        <span className="absolute -top-1.5 -right-2.5 text-[11px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 rgba(140,122,107,0.4), 0.5px -0.5px 0 rgba(140,122,107,0.4), -0.5px 0.5px 0 rgba(140,122,107,0.4), 0.5px 0.5px 0 rgba(140,122,107,0.4)" }}>✦</span>
                       )}
                       {isToday && (
-                        <span className="absolute -bottom-1 -left-2.5 text-[10px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 #8C7A6B, 0.5px -0.5px 0 #8C7A6B, -0.5px 0.5px 0 #8C7A6B, 0.5px 0.5px 0 #8C7A6B" }}>✦</span>
+                        <span className="absolute -bottom-1 -left-2.5 text-[10px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 rgba(140,122,107,0.4), 0.5px -0.5px 0 rgba(140,122,107,0.4), -0.5px 0.5px 0 rgba(140,122,107,0.4), 0.5px 0.5px 0 rgba(140,122,107,0.4)" }}>✦</span>
                       )}
                     </span>
+
+                    {/* 特殊備註圖示：調整至靠近日期右上角 (w-4 h-4, 內含大一點的驚嘆號) */}
+                    {note && (
+                      <div 
+                        onClick={(e) => handleOpenNoteModal(e, dateKey)}
+                        className="absolute top-0 right-0 w-4 h-4 bg-[#C97B7E] rounded-full flex items-center justify-center z-30 cursor-pointer shadow-sm hover:scale-110 transition-transform"
+                        title={note}
+                      >
+                        <span className="text-[10px] text-[#F9F1D0] font-bold leading-none">!</span>
+                      </div>
+                    )}
+
+                    {/* 管理員模式下，未有備註的日期也可點擊右上角快速加備註（隱藏按鈕，hover顯示） */}
+                    {!isReadOnly && !note && (
+                      <div 
+                        onClick={(e) => handleOpenNoteModal(e, dateKey)}
+                        className="absolute top-0 right-0 w-3.5 h-3.5 bg-black/10 hover:bg-[#C97B7E] rounded-full flex items-center justify-center z-30 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        title="新增備註"
+                      >
+                        <span className="text-[9px] text-white font-bold">+</span>
+                      </div>
+                    )}
+
+                    {/* 點擊或滑鼠移入出現的備註氣泡提示 */}
+                    {activeTooltip === dateKey && note && (
+                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-[#5D4B41] text-[#F8F6F2] text-[11px] px-3 py-1.5 rounded-xl shadow-lg z-50 whitespace-nowrap pointer-events-none">
+                        {note}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#5D4B41]"></div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
+ {/* 底部圖例說明區 (已加入特殊備註驚嘆號圖示) */}
             <div className="mt-4 pt-3 relative">
               <div className="absolute top-0 left-2 right-2 border-t-[1.5px] border-dashed border-[#e0d6cd]/80"></div>
-              <div className="flex justify-center gap-5 items-center pt-1">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-[16px] h-[16px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full"></div>
-                  <span className="text-[14px] font-bold text-[#5D4B41] tracking-widest">尚有空位</span>
+              <div className="flex justify-center gap-3.5 items-center pt-1">
+                <div className="flex items-center gap-1">
+                  <div className="w-[14px] h-[14px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full"></div>
+                  <span className="text-[11px] font-bold text-[#5D4B41]">尚有空位</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-[16px] h-[16px] bg-[#9BB1CC]" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
-                  <span className="text-[14px] font-bold text-[#5D4B41] tracking-widest">已額滿</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-[14px] h-[14px] bg-[#9BB1CC]" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
+                  <span className="text-[11px] font-bold text-[#5D4B41]">額滿</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-[16px] h-[16px] bg-[#E29A9F]" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
-                  <span className="text-[14px] font-bold text-[#5D4B41] tracking-widest">休假</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-[14px] h-[14px] bg-[#E29A9F]" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
+                  <span className="text-[11px] font-bold text-[#5D4B41]">休假</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-[15px] h-[15px] bg-[#C97B7E] rounded-full flex items-center justify-center">
+                    <span className="text-[10px] text-[#F9F1D0] font-bold leading-none">!</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#5D4B41]">特殊備註</span>
                 </div>
               </div>
             </div>
@@ -340,6 +436,40 @@
             <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/50 hover:bg-[#F8F6F2] rounded-full text-[#A89B90] hover:text-[#5D4B41] text-[11px] font-bold tracking-widest transition-all cursor-pointer shadow-sm"
                  onClick={() => setShowLoginModal(true)}>
               ✦ 訪客瀏覽模式 (點此登入管理員) ✦
+            </div>
+          )}
+
+          {/* 管理員編輯備註彈窗 */}
+          {activeNoteModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[320px] shadow-xl flex flex-col items-center">
+                <h3 className="text-[16px] font-bold text-[#5D4B41] mb-1">✏️ 編輯 {activeNoteModal} 備註</h3>
+                <p className="text-[11px] text-[#A89B90] mb-4 text-center">輸入特殊說明（如：過年營業至初三、僅半天營業）</p>
+                <textarea 
+                  rows="3"
+                  placeholder="請輸入特殊備註 (若留空則清除)" 
+                  value={tempNoteText}
+                  onChange={(e) => setTempNoteText(e.target.value)}
+                  autoFocus
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-[13px] outline-none resize-none mb-3"
+                />
+                <div className="flex gap-2 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveNoteModal(null)}
+                    className="flex-1 py-2 bg-gray-200 text-[#5D4B41] font-bold rounded-xl text-[13px]"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleSaveNote}
+                    className="flex-1 py-2 bg-[#5D4B41] text-white font-bold rounded-xl text-[13px] shadow"
+                  >
+                    儲存備註
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
