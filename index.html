@@ -26,7 +26,7 @@
     );
 
     function ReservationCalendar() {
-      // 取得當前真實系統時間的年月作為起始點（例如 2026年10月）
+      // 取得當前真實系統時間的年月作為起始點
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
       const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1); // 最多看未來兩個月
@@ -34,6 +34,7 @@
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
       const [dayNotes, setDayNotes] = useState({}); // 儲存特殊備註
+      const [noticeText, setNoticeText] = useState("🌿 歡迎來到 AMBO 工作室！\n\n1. 預約請透過右下角 LINE 聯繫。\n2. 預約保留 15 分鐘，若需改期請提前告知。\n3. 工作室地點：請洽詢官方 LINE。"); // 預約須知內容
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
@@ -46,6 +47,14 @@
 
       // 提示氣泡狀態（點擊或hover顯示備註）
       const [activeTooltip, setActiveTooltip] = useState(null);
+
+      // 預約須知彈窗狀態
+      const [showNoticeModal, setShowNoticeModal] = useState(false);
+      const [isEditingNotice, setIsEditingNotice] = useState(false);
+      const [tempNoticeText, setTempNoticeText] = useState("");
+
+      // 月份切換動態轉場效果狀態 (Smooth Fade-in & Flip)
+      const [isAnimating, setIsAnimating] = useState(true);
 
       // 你的 Google 試算表網頁應用程式網址（已內建綁定）
       const scriptUrl = "https://script.google.com/macros/s/AKfycbwuJQ2zE-8YRxbZdxtVhgW02SJuhQwtYIVu-B73Ic46EwgJ4FcCCELafHT5RvxA-KiIbw/exec";
@@ -80,6 +89,7 @@
           if (data) {
             if (data.statuses) setDayStatuses(data.statuses);
             if (data.notes) setDayNotes(data.notes);
+            if (data.notice) setNoticeText(data.notice);
             setSyncStatus("✨已同步");
           } else {
             setSyncStatus("✨ 尚無排班資料");
@@ -102,13 +112,25 @@
       const handlePrevMonth = () => {
         const target = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
         if (target < minAllowedDate) return; 
-        setCurrentDate(target);
+        
+        // 觸發絲滑日曆翻頁淡入淡出動畫
+        setIsAnimating(false);
+        setTimeout(() => {
+          setCurrentDate(target);
+          setIsAnimating(true);
+        }, 150);
       };
 
       const handleNextMonth = () => {
         const target = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
         if (target > maxAllowedDate) return;
-        setCurrentDate(target);
+        
+        // 觸發絲滑日曆翻頁淡入淡出動畫
+        setIsAnimating(false);
+        setTimeout(() => {
+          setCurrentDate(target);
+          setIsAnimating(true);
+        }, 150);
       };
 
       const handleCellClick = (e, dateKey) => {
@@ -116,7 +138,6 @@
         const hasNote = !!dayNotes[dateKey];
 
         if (isReadOnly) {
-          // 訪客模式：若有備註則點擊格子直接切換顯示氣泡
           if (hasNote) {
             setActiveTooltip(activeTooltip === dateKey ? null : dateKey);
           } else {
@@ -125,7 +146,6 @@
           return;
         }
 
-        // 管理員模式：點擊格子切換狀態
         toggleDayStatus(dateKey);
       };
 
@@ -145,13 +165,11 @@
       };
 
       const handleOpenNoteModal = (e, dateKey) => {
-        e.stopPropagation(); // 阻止事件冒泡，避免同時觸發換狀態
+        e.stopPropagation(); 
         if (isReadOnly) {
-          // 訪客模式點擊驚嘆號也直接展開備註氣泡
           setActiveTooltip(activeTooltip === dateKey ? null : dateKey);
           return;
         }
-        // 管理員模式：打開編輯備註彈窗
         setActiveNoteModal(dateKey);
         setTempNoteText(dayNotes[dateKey] || "");
       };
@@ -172,6 +190,11 @@
         setTempNoteText("");
       };
 
+      const handleSaveNotice = () => {
+        setNoticeText(tempNoticeText);
+        setIsEditingNotice(false);
+      };
+
       const handleManualSave = async () => {
         if (isReadOnly) return;
         if (!scriptUrl) return;
@@ -184,12 +207,11 @@
             method: "POST",
             mode: "no-cors",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ statuses: dayStatuses, notes: dayNotes })
+            body: JSON.stringify({ statuses: dayStatuses, notes: dayNotes, notice: noticeText })
           });
 
           setIsSaving(false);
           setSyncStatus("🎉儲存成功！全網已同步");
-          // 3秒後恢復正常同步提示
           setTimeout(() => setSyncStatus("✨已同步"), 4000);
         } catch(err) {
           setIsSaving(false);
@@ -230,8 +252,8 @@
           backgroundPosition: "calc(50% + 6px) center" 
         }} onClick={() => setActiveTooltip(null)}>
           
-          {/* 上方導覽列（加入即時狀態提示文字） */}
-          <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-4 relative z-20 shadow-sm">
+          {/* 上方導覽列（包含切換月份與預約須知按鈕） */}
+          <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-3 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
             
             <button 
@@ -244,10 +266,20 @@
               <ChevronLeft />
             </button>
 
-            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-2"
+            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-1"
                  onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
               {isReadOnly ? `✦ 可左右切換月份 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
+
+            {/* 預約須知按鈕 */}
+            <button 
+              onClick={() => setShowNoticeModal(true)}
+              className="px-2.5 py-1 bg-[#CDBEAD]/30 hover:bg-[#CDBEAD]/50 text-[#5D4B41] rounded-full text-[11px] font-bold tracking-wider transition-all flex items-center gap-1 shrink-0"
+              title="預約須知"
+            >
+              <span>ℹ️</span>
+              <span>預約須知</span>
+            </button>
 
             <button 
               onClick={handleNextMonth} 
@@ -260,8 +292,10 @@
             </button>
           </div>
 
-          {/* 日曆卡片主體 */}
-          <div className="w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col">
+          {/* 日曆卡片主體 (結合 Smooth Fade-in & Flip 動態效果) */}
+          <div className={`w-full max-w-[400px] relative bg-[#F8F6F2]/70 shadow-md rounded-[2rem] overflow-hidden px-6 pt-5 pb-5 flex flex-col transition-all duration-300 transform ${
+            isAnimating ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2'
+          }`}>
             
             <div className="absolute top-[6px] left-1/2 -translate-x-1/2 text-[8px] font-medium tracking-[0.15em] text-[#A89B90] pointer-events-none">
               ▪︎AMBO.ART▪︎
@@ -316,7 +350,6 @@
                 const status = dayStatuses[dateKey] || 'available';
                 const note = dayNotes[dateKey];
                 
-                // 判斷是否為今天
                 const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
                 
                 return (
@@ -344,7 +377,6 @@
                       status === 'off' || status === 'full' ? 'text-white' : 'text-[#5D4B41]'
                     }`}>
                       {day}
-                      {/* 今日導引：右上與左下加上奶白黃色閃光星芒 */}
                       {isToday && (
                         <span className="absolute -top-1.5 -right-2.5 text-[11px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 rgba(140,122,107,0.4), 0.5px -0.5px 0 rgba(140,122,107,0.4), -0.5px 0.5px 0 rgba(140,122,107,0.4), 0.5px 0.5px 0 rgba(140,122,107,0.4)" }}>✦</span>
                       )}
@@ -353,7 +385,6 @@
                       )}
                     </span>
 
-                    {/* 特殊備註圖示：調整至靠近日期右上角 (w-4 h-4, 內含大一點的驚嘆號) */}
                     {note && (
                       <div 
                         onClick={(e) => handleOpenNoteModal(e, dateKey)}
@@ -364,7 +395,6 @@
                       </div>
                     )}
 
-                    {/* 管理員模式下，未有備註的日期也可點擊右上角快速加備註（隱藏按鈕，hover顯示） */}
                     {!isReadOnly && !note && (
                       <div 
                         onClick={(e) => handleOpenNoteModal(e, dateKey)}
@@ -375,7 +405,6 @@
                       </div>
                     )}
 
-                    {/* 點擊或滑鼠移入出現的備註氣泡提示 */}
                     {activeTooltip === dateKey && note && (
                       <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-[#5D4B41] text-[#F8F6F2] text-[11px] px-3 py-1.5 rounded-xl shadow-lg z-50 whitespace-nowrap pointer-events-none">
                         {note}
@@ -387,7 +416,7 @@
               })}
             </div>
 
-            {/* 底部圖例說明區 (已加入特殊備註驚嘆號圖示) */}
+            {/* 底部圖例說明區 */}
             <div className="mt-4 pt-3 relative">
               <div className="absolute top-0 left-2 right-2 border-t-[1.5px] border-dashed border-[#e0d6cd]/80"></div>
               <div className="flex justify-center gap-3.5 items-center pt-1">
@@ -414,7 +443,7 @@
             
           </div>
 
-          {/* 管理員儲存按鈕（加入明顯的動態提示） */}
+          {/* 管理員儲存按鈕 */}
           {!isReadOnly && (
             <div className="mt-4 w-full max-w-[400px] flex flex-col gap-2">
               <button 
@@ -438,7 +467,7 @@
             </div>
           )}
 
-          {/* 右下角固定浮動 LINE 按鈕 (貼齊日曆右下方) */}
+          {/* 右下角固定浮動 LINE 按鈕 */}
           <div className="fixed bottom-5 right-5 sm:right-[calc(50%-200px+20px)] z-40">
             <a 
               href="https://lin.ee/wzabvly" 
@@ -453,6 +482,71 @@
               </span>
             </a>
           </div>
+
+          {/* 預約須知彈窗 (支援捲軸、奶白大框、compact標題) */}
+          {showNoticeModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowNoticeModal(false)}>
+              <div className="bg-[#F8F6F2] rounded-3xl p-5 w-full max-w-[340px] shadow-xl flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-[16px] font-bold text-[#5D4B41] mb-2">✦ 預約須知 ✦</h3>
+                
+                {!isEditingNotice ? (
+                  <>
+                    <div className="w-full bg-white px-4 py-3 rounded-2xl border border-[#CDBEAD]/50 text-[13px] text-[#5D4B41] whitespace-pre-line leading-relaxed mb-4 max-h-[320px] min-h-[180px] overflow-y-auto shadow-inner">
+                      {noticeText}
+                    </div>
+                    
+                    <div className="flex gap-2 w-full">
+                      {!isReadOnly && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsEditingNotice(true);
+                            setTempNoticeText(noticeText);
+                          }}
+                          className="flex-1 py-2.5 bg-[#CDBEAD] hover:bg-[#bcad9c] text-[#5D4B41] font-bold rounded-xl text-[14px]"
+                        >
+                          編輯須知
+                        </button>
+                      )}
+                      <button 
+                        type="button" 
+                        onClick={() => setShowNoticeModal(false)}
+                        className="flex-1 py-2.5 bg-[#5D4B41] text-white font-bold rounded-xl text-[14px] shadow"
+                      >
+                        關閉視窗
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <textarea 
+                      rows="8"
+                      value={tempNoticeText}
+                      onChange={(e) => setTempNoticeText(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-[13px] outline-none resize-none mb-3 max-h-[320px] min-h-[180px] overflow-y-auto shadow-inner"
+                      placeholder="請輸入預約須知內容..."
+                    />
+                    <div className="flex gap-2 w-full">
+                      <button 
+                        type="button" 
+                        onClick={() => setIsEditingNotice(false)}
+                        className="flex-1 py-2.5 bg-gray-200 text-[#5D4B41] font-bold rounded-xl text-[14px]"
+                      >
+                        取消
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={handleSaveNotice}
+                        className="flex-1 py-2.5 bg-[#5D4B41] text-white font-bold rounded-xl text-[14px] shadow"
+                      >
+                        確認修改
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 管理員編輯備註彈窗 */}
           {activeNoteModal && (
