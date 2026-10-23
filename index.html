@@ -260,6 +260,9 @@
                 const dateKey = `${year}-${month + 1}-${day}`;
                 const status = dayStatuses[dateKey] || 'available';
                 
+                // 判斷是否為今天
+                const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+                
                 return (
                   <div 
                     key={dateKey} 
@@ -279,10 +282,17 @@
                              style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%", transform: "rotate(3deg)" }}></div>
                       )}
                     </div>
-                    <span className={`text-[13px] font-bold z-10 transition-colors ${
+                    <span className={`text-[13px] font-bold z-10 transition-colors relative ${
                       status === 'off' || status === 'full' ? 'text-white' : 'text-[#5D4B41]'
                     }`}>
                       {day}
+                      {/* 今日導引：右上與左下加上奶白黃色閃光星芒，帶超級細微柔和的邊界感 */}
+                      {isToday && (
+                        <span className="absolute -top-1.5 -right-2.5 text-[11px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 #8C7A6B, 0.5px -0.5px 0 #8C7A6B, -0.5px 0.5px 0 #8C7A6B, 0.5px 0.5px 0 #8C7A6B" }}>✦</span>
+                      )}
+                      {isToday && (
+                        <span className="absolute -bottom-1 -left-2.5 text-[10px] text-[#F9F1D0] font-bold select-none pointer-events-none" style={{ textShadow: "-0.5px -0.5px 0 #8C7A6B, 0.5px -0.5px 0 #8C7A6B, -0.5px 0.5px 0 #8C7A6B, 0.5px 0.5px 0 #8C7A6B" }}>✦</span>
+                      )}
                     </span>
                   </div>
                 );
@@ -321,7 +331,7 @@
                     : 'bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2]'
                 }`}
               >
-                <span>{syncStatus.includes("成功") ? "🎉 儲存成功！全網已同步" : "💾 立即儲存並同步至 Google 試算表"}</span>
+                <span>{syncStatus.includes("成功") ? "🎉儲存成功！全網已同步" : "💾立即儲存並同步至 Google 試算表"}</span>
               </button>
             </div>
           )}
