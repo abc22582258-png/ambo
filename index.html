@@ -266,9 +266,8 @@
               <ChevronLeft />
             </button>
 
-            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] cursor-pointer truncate px-1"
-                 onClick={() => { if(isReadOnly) setShowLoginModal(true); }}>
-              {isReadOnly ? `✦ 可左右切換月份 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
+            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] truncate px-1">
+  {isReadOnly ? `✦ 可左右切換月份 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
 
             <button 
