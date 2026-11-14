@@ -43,6 +43,9 @@
       const [showLoginModal, setShowLoginModal] = useState(false);
       const [adminPassword, setAdminPassword] = useState("");
 
+      // 尚未開放月份點擊的溫柔提示 Toast 狀態
+      const [toastMessage, setToastMessage] = useState(null);
+
       // 備註彈窗狀態 (管理員編輯用)
       const [activeNoteModal, setActiveNoteModal] = useState(null); // dateKey
       const [tempNoteText, setTempNoteText] = useState("");
@@ -140,8 +143,12 @@
         const status = dayStatuses[dateKey] || 'available';
 
         if (isReadOnly) {
-          // 若該月份尚未開放，訪客無法點擊選取
+          // 若該月份尚未開放，訪客點擊時彈出溫柔提示 Toast
           if (!isMonthOpen) {
+            setToastMessage("🌱 該月份目前尚未開放預約唷!");
+            setTimeout(() => {
+              setToastMessage(null);
+            }, 3000);
             return;
           }
 
@@ -282,6 +289,13 @@
           backgroundPosition: "calc(50% + 6px) center" 
         }} onClick={() => setActiveTooltip(null)}>
           
+          {/* 溫柔提示 Toast 訊息彈窗 */}
+          {toastMessage && (
+            <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-[#5D4B41] text-[#F8F6F2] text-[12px] font-bold px-4 py-2.5 rounded-2xl shadow-xl z-50 animate-bounce transition-all tracking-wide">
+              {toastMessage}
+            </div>
+          )}
+
           {/* 上方導覽列 */}
           <div className="w-full max-w-[400px] h-[44px] mb-[24px] bg-[#F8F6F2] rounded-full flex justify-between items-center px-3 relative z-20 shadow-sm">
             <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#F8F6F2] rotate-45 rounded-[2px]"></div>
@@ -398,7 +412,7 @@
                     key={dateKey} 
                     onClick={(e) => handleCellClick(e, dateKey)}
                     onMouseEnter={() => { if(note && isReadOnly) setActiveTooltip(dateKey); }}
-                    className={`flex flex-col items-center justify-center group h-[34px] relative ${isReadOnly && !isMonthOpen ? 'cursor-default' : 'cursor-pointer'}`}
+                    className={`flex flex-col items-center justify-center group h-[34px] relative ${isReadOnly && !isMonthOpen ? 'cursor-pointer' : 'cursor-pointer'}`}
                   >
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       {status === 'available' && (
@@ -520,7 +534,6 @@
                     navigator.clipboard.writeText(text).catch(() => {});
                     
                     // 使用 LINE 官方預填訊息網址 (oaMessage)，自動帶入文字並直接喚醒 LINE
-                    // 若您的官方帳號 ID 不同，可將 @ambo 替換成您的實際 ID
                     const lineOaUrl = `https://line.me/R/oaMessage/@071jlkwy/?${encodeURIComponent(text)}`;
                     window.open(lineOaUrl, "_blank");
                   }}
