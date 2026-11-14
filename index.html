@@ -500,7 +500,7 @@
                 <button 
                   onClick={() => {
                     const sorted = [...selectedDates].sort();
-                    const text = `您好，我想預約 AMBO 以下日期：\n${sorted.join(', ')}\n再請幫我確認檔期，謝謝！`;
+                    const text = `您好，我想預約以下日期：\n${sorted.join(', ')}\n再請幫我確認檔期，謝謝！`;
                     navigator.clipboard.writeText(text).then(() => {
                       alert("📋 已自動複製預約清單！即將為您打開 LINE...");
                       window.open("https://lin.ee/wzabvly", "_blank");
