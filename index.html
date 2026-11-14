@@ -29,7 +29,7 @@
       // 取得當前真實系統時間的年月作為起始點
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 2, 1); // 最多看未來兩個月
+      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 3, 1); // 最多看未來兩個月
 
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
@@ -140,6 +140,11 @@
         const status = dayStatuses[dateKey] || 'available';
 
         if (isReadOnly) {
+          // 若該月份尚未開放，訪客無法點擊選取
+          if (!isMonthOpen) {
+            return;
+          }
+
           // 訪客模式：若為尚有空位，可進行多選點擊
           if (status === 'available') {
             setSelectedDates(prev => 
@@ -330,13 +335,13 @@
               </g>
             </svg>
 
-            {/* 右上角已開放/尚未開放狀態標籤 */}
+            {/* 右上角已開放/尚未開放狀態標籤（水泥灰風格） */}
             <div className="absolute top-5 right-14 z-20">
               {!isReadOnly ? (
                 <button 
                   onClick={() => toggleMonthStatus(monthKey)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider transition-all shadow-sm ${
-                    isMonthOpen ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-500 text-white hover:bg-gray-600'
+                    isMonthOpen ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-[#8C8C8C] hover:bg-[#7D7D7D] text-white'
                   }`}
                   title="點擊切換月份開放狀態"
                 >
@@ -344,7 +349,7 @@
                 </button>
               ) : (
                 <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${
-                  isMonthOpen ? 'text-emerald-700 bg-emerald-100/60' : 'text-gray-600 bg-gray-200/60'
+                  isMonthOpen ? 'text-emerald-700 bg-emerald-100/60' : 'text-[#4A4A4A] bg-[#CACACA]/90'
                 }`}>
                   {isMonthOpen ? '🟢 已開放' : '🔒 尚未開放'}
                 </div>
@@ -393,7 +398,7 @@
                     key={dateKey} 
                     onClick={(e) => handleCellClick(e, dateKey)}
                     onMouseEnter={() => { if(note && isReadOnly) setActiveTooltip(dateKey); }}
-                    className={`flex flex-col items-center justify-center group h-[34px] relative cursor-pointer`}
+                    className={`flex flex-col items-center justify-center group h-[34px] relative ${isReadOnly && !isMonthOpen ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       {status === 'available' && (
@@ -502,7 +507,7 @@
                     const sorted = [...selectedDates].sort();
                     const text = `您好，我想預約以下日期：\n${sorted.join(', ')}\n再請幫我確認檔期，謝謝！`;
                     navigator.clipboard.writeText(text).then(() => {
-                      alert("📋 已自動複製預約清單！即將為您打開 LINE...");
+                      alert("📋已自動複製預約清單！即將為您打開LINE...");
                       window.open("https://lin.ee/wzabvly", "_blank");
                     }).catch(() => {
                       window.open("https://lin.ee/wzabvly", "_blank");
