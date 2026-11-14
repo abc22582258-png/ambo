@@ -29,7 +29,7 @@
       // 取得當前真實系統時間的年月作為起始點
       const now = new Date();
       const minAllowedDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 3, 1); // 最多看未來兩個月
+      const maxAllowedDate = new Date(now.getFullYear(), now.getMonth() + 3, 1); // 最多看未來三個月
 
       const [currentDate, setCurrentDate] = useState(minAllowedDate); 
       const [dayStatuses, setDayStatuses] = useState({});
@@ -468,7 +468,7 @@
                     <div className="w-[13px] h-[13px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full shrink-0"></div>
                     <span className="text-[12px] font-bold text-[#5D4B41]">尚有空位</span>
                   </div>
-                  <span className="text-[10px] text-[#A89B90] leading-tight ml-2"> (可複選)</span>
+                  <span className="text-[10px] text-[#A89B90] leading-tight ml-2">(可複選)</span>
                 </div>
                 
                 <div className="flex items-center gap-1 pt-0.5">
@@ -515,12 +515,14 @@
                   onClick={() => {
                     const sorted = [...selectedDates].sort();
                     const text = `您好，我想預約以下日期：\n${sorted.join(', ')}\n再請幫我確認檔期，謝謝！`;
-                    navigator.clipboard.writeText(text).then(() => {
-                      alert("📋已自動複製預約清單！即將為您打開LINE...");
-                      window.open("https://lin.ee/wzabvly", "_blank");
-                    }).catch(() => {
-                      window.open("https://lin.ee/wzabvly", "_blank");
-                    });
+                    
+                    // 優先複製到剪貼簿作為雙重備份
+                    navigator.clipboard.writeText(text).catch(() => {});
+                    
+                    // 使用 LINE 官方預填訊息網址 (oaMessage)，自動帶入文字並直接喚醒 LINE
+                    // 若您的官方帳號 ID 不同，可將 @ambo 替換成您的實際 ID
+                    const lineOaUrl = `https://line.me/R/oaMessage/@ambo/?${encodeURIComponent(text)}`;
+                    window.open(lineOaUrl, "_blank");
                   }}
                   className="px-3.5 py-1.5 bg-[#8E7456] hover:bg-[#7d6449] text-[#F9F1D0] rounded-xl text-[11px] font-bold shadow transition-all"
                 >
