@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" style="-webkit-text-size-adjust: 100%;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -11,8 +11,13 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+  </style>
 </head>
-<body class="bg-[#e0d6cd]">
+<body class="bg-[#e0d6cd]" style="-webkit-text-size-adjust: 100%;">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -295,7 +300,8 @@
           backgroundColor: "#e0d6cd", 
           backgroundImage: "radial-gradient(#bfaea2 1.5px, transparent 1.5px)", 
           backgroundSize: "16px 16px", 
-          backgroundPosition: "calc(50% + 6px) center" 
+          backgroundPosition: "calc(50% + 6px) center",
+          WebkitTextSizeAdjust: "100%"
         }} onClick={() => setActiveTooltip(null)}>
           
           {/* 溫柔提示 Toast 訊息彈窗 */}
