@@ -42,7 +42,7 @@
       const [monthStatuses, setMonthStatuses] = useState({}); // 儲存各月份開放狀態
       const [selectedDates, setSelectedDates] = useState([]); // 訪客多選預約日期
       const [selectedServices, setSelectedServices] = useState([]); // 訪客多選預約項目
-      const [noticeText, setNoticeText] = useState("🌿 歡迎來到 AMBO 工作室！\n\n1. 預約請透過右下角 LINE 聯繫。\n2. 預約保留 15 分鐘，若需改期請提前告知。\n3. 工作室地點：請洽詢官方 LINE。"); // 預約須知內容
+      const [noticeText, setNoticeText] = useState("🗓每月25號20:00開放「下下個月」預約。\n\n1. 💬 如果想預約的日期已額滿，\n2. 可留言排候補，有釋出名額會通知您♡\n\n3. ▪️採定金制，請確認時間再進行預約。\n4. ▪️收到「完成預約✅」即成功保留時段♡"); // 預約須知內容
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
@@ -494,30 +494,30 @@
               <div className="flex justify-center gap-3 items-start pt-1 text-center">
                 <div className="flex flex-col items-center">
                   <div className="flex items-center gap-1 pt-0.5">
-                    <div className="w-[14px] h-[14px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full shrink-0"></div>
-                    <span className="text-[13px] font-bold text-[#5D4B41]">尚有空位</span>
+                    <div className="w-[15px] h-[15px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full shrink-0"></div>
+                    <span className="text-[14px] font-bold text-[#5D4B41]">尚有空位</span>
                   </div>
-                  <span className="text-[11px] text-[#A89B90] leading-tight ml-2">(可複選)</span>
+                  <span className="text-[12px] text-[#A89B90] leading-tight ml-2">(可複選)</span>
                 </div>
                 
                 <div className="flex items-center gap-1 pt-0.5">
-                  <div className="w-[14px] h-[14px] bg-[#9BB1CC] shrink-0" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
-                  <span className="text-[13px] font-bold text-[#5D4B41]">額滿</span>
+                  <div className="w-[15px] h-[15px] bg-[#9BB1CC] shrink-0" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
+                  <span className="text-[14px] font-bold text-[#5D4B41]">額滿</span>
                 </div>
 
                 <div className="flex items-center gap-1 pt-0.5">
-                  <div className="w-[14px] h-[14px] bg-[#E29A9F] shrink-0" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
-                  <span className="text-[13px] font-bold text-[#5D4B41]">休假</span>
+                  <div className="w-[15px] h-[15px] bg-[#E29A9F] shrink-0" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
+                  <span className="text-[14px] font-bold text-[#5D4B41]">休假</span>
                 </div>
 
                 <div className="flex flex-col items-center">
                   <div className="flex items-center gap-1 pt-0.5">
-                    <div className="w-[14px] h-[14px] bg-[#C97B7E] rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-[10px] text-[#F9F1D0] font-bold leading-none">!</span>
+                    <div className="w-[15px] h-[15px] bg-[#C97B7E] rounded-full flex items-center justify-center shrink-0">
+                      <span className="text-[12px] text-[#F9F1D0] font-bold leading-none">!</span>
                     </div>
-                    <span className="text-[13px] font-bold text-[#5D4B41]">特殊日</span>
+                    <span className="text-[14px] font-bold text-[#5D4B41]">特殊日</span>
                   </div>
-                  <span className="text-[11px] text-[#A89B90] leading-tight ml-4">(可點擊)</span>
+                  <span className="text-[12px] text-[#A89B90] leading-tight ml-4">(可點擊)</span>
                 </div>
               </div>
             </div>
