@@ -59,8 +59,8 @@
       // 提示氣泡狀態（點擊或hover顯示備註）
       const [activeTooltip, setActiveTooltip] = useState(null);
 
-      // 預約須知彈窗狀態
-      const [showNoticeModal, setShowNoticeModal] = useState(false);
+      // 預約須知彈窗狀態 (預設初次進入網頁時自動彈出一次)
+      const [showNoticeModal, setShowNoticeModal] = useState(true);
       const [isEditingNotice, setIsEditingNotice] = useState(false);
       const [tempNoticeText, setTempNoticeText] = useState("");
 
@@ -325,7 +325,7 @@
               <ChevronLeft />
             </button>
 
-            <div className="flex-1 text-center text-[11px] font-bold tracking-widest text-[#A89B90] truncate px-1">
+            <div className="flex-1 text-center text-[12px] font-bold tracking-widest text-[#A89B90] truncate px-1">
               {isReadOnly ? `✦ 可左右切換月份 (${syncStatus}) ✦` : `✦ 管理員編輯模式 (${syncStatus}) ✦`}
             </div>
 
@@ -494,30 +494,30 @@
               <div className="flex justify-center gap-3 items-start pt-1 text-center">
                 <div className="flex flex-col items-center">
                   <div className="flex items-center gap-1 pt-0.5">
-                    <div className="w-[13px] h-[13px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full shrink-0"></div>
-                    <span className="text-[12px] font-bold text-[#5D4B41]">尚有空位</span>
+                    <div className="w-[14px] h-[14px] border-[1.5px] border-dashed border-[#CDBEAD] rounded-full shrink-0"></div>
+                    <span className="text-[13px] font-bold text-[#5D4B41]">尚有空位</span>
                   </div>
-                  <span className="text-[10px] text-[#A89B90] leading-tight ml-2">(可複選)</span>
+                  <span className="text-[11px] text-[#A89B90] leading-tight ml-2">(可複選)</span>
                 </div>
                 
                 <div className="flex items-center gap-1 pt-0.5">
-                  <div className="w-[13px] h-[13px] bg-[#9BB1CC] shrink-0" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
-                  <span className="text-[12px] font-bold text-[#5D4B41]">額滿</span>
+                  <div className="w-[14px] h-[14px] bg-[#9BB1CC] shrink-0" style={{ borderRadius: "43% 57% 65% 35% / 55% 45% 55% 45%" }}></div>
+                  <span className="text-[13px] font-bold text-[#5D4B41]">額滿</span>
                 </div>
 
                 <div className="flex items-center gap-1 pt-0.5">
-                  <div className="w-[13px] h-[13px] bg-[#E29A9F] shrink-0" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
-                  <span className="text-[12px] font-bold text-[#5D4B41]">休假</span>
+                  <div className="w-[14px] h-[14px] bg-[#E29A9F] shrink-0" style={{ borderRadius: "55% 45% 35% 65% / 45% 55% 45% 55%" }}></div>
+                  <span className="text-[13px] font-bold text-[#5D4B41]">休假</span>
                 </div>
 
                 <div className="flex flex-col items-center">
                   <div className="flex items-center gap-1 pt-0.5">
-                    <div className="w-[13px] h-[13px] bg-[#C97B7E] rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-[9px] text-[#F9F1D0] font-bold leading-none">!</span>
+                    <div className="w-[14px] h-[14px] bg-[#C97B7E] rounded-full flex items-center justify-center shrink-0">
+                      <span className="text-[10px] text-[#F9F1D0] font-bold leading-none">!</span>
                     </div>
-                    <span className="text-[12px] font-bold text-[#5D4B41]">特殊日</span>
+                    <span className="text-[13px] font-bold text-[#5D4B41]">特殊日</span>
                   </div>
-                  <span className="text-[10px] text-[#A89B90] leading-tight ml-4">(可點擊)</span>
+                  <span className="text-[11px] text-[#A89B90] leading-tight ml-4">(可點擊)</span>
                 </div>
               </div>
             </div>
