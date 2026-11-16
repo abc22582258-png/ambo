@@ -36,6 +36,7 @@
       const [dayNotes, setDayNotes] = useState({}); // 儲存特殊備註
       const [monthStatuses, setMonthStatuses] = useState({}); // 儲存各月份開放狀態
       const [selectedDates, setSelectedDates] = useState([]); // 訪客多選預約日期
+      const [selectedServices, setSelectedServices] = useState([]); // 訪客多選預約項目
       const [noticeText, setNoticeText] = useState("🌿 歡迎來到 AMBO 工作室！\n\n1. 預約請透過右下角 LINE 聯繫。\n2. 預約保留 15 分鐘，若需改期請提前告知。\n3. 工作室地點：請洽詢官方 LINE。"); // 預約須知內容
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
@@ -186,6 +187,14 @@
         });
       };
 
+      const toggleService = (service) => {
+        setSelectedServices(prev =>
+          prev.includes(service)
+            ? prev.filter(s => s !== service)
+            : [...prev, service]
+        );
+      };
+
       const handleOpenNoteModal = (e, dateKey) => {
         e.stopPropagation(); 
         if (isReadOnly) {
@@ -281,7 +290,7 @@
       ];
 
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans relative pb-24" style={{ 
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans relative pb-40" style={{ 
           fontFamily: "'Quicksand', sans-serif",
           backgroundColor: "#e0d6cd", 
           backgroundImage: "radial-gradient(#bfaea2 1.5px, transparent 1.5px)", 
@@ -509,38 +518,65 @@
             
           </div>
 
-          {/* 訪客多選預約浮動列 */}
+          {/* 訪客多選預約浮動列（包含服務項目複選與確認檔期按鈕） */}
           {selectedDates.length > 0 && isReadOnly && (
-            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] bg-[#5D4B41] text-[#F8F6F2] px-4 py-3 rounded-2xl shadow-xl flex items-center justify-between z-50 animate-pulse">
-              <div className="flex flex-col">
-                <span className="text-[12px] font-bold">✨ 已勾選 {selectedDates.length} 個預約日期</span>
-                <span className="text-[10px] text-[#CDBEAD] truncate max-w-[190px]">
-                  {selectedDates.sort().join(', ')}
-                </span>
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[390px] bg-[#5D4B41] text-[#F8F6F2] px-4 py-3.5 rounded-2xl shadow-xl flex flex-col gap-3 z-50">
+              {/* 服務項目複選區 */}
+              <div className="flex flex-col gap-1.5 border-b border-white/15 pb-2.5">
+                <span className="text-[11px] font-bold text-[#CDBEAD] tracking-wide">✦ 請選擇預約項目 (可複選)：</span>
+                <div className="flex gap-2 flex-wrap">
+                  {['美睫', '霧眉', '無創'].map((service) => {
+                    const isSelected = selectedServices.includes(service);
+                    return (
+                      <button
+                        key={service}
+                        onClick={() => toggleService(service)}
+                        className={`px-3 py-1 rounded-xl text-[11px] font-bold transition-all border ${
+                          isSelected 
+                            ? 'bg-[#8E7456] border-[#8E7456] text-[#F9F1D0] shadow-sm scale-105' 
+                            : 'bg-white/5 border-white/20 text-[#CDBEAD] hover:bg-white/10'
+                        }`}
+                      >
+                        {isSelected ? `✓ ${service}` : service}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setSelectedDates([])}
-                  className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold transition-all"
-                >
-                  清除
-                </button>
-                <button 
-                  onClick={() => {
-                    const sorted = [...selectedDates].sort();
-                    const text = `您好，我想預約以下日期：\n${sorted.join(', ')}\n再請幫我確認檔期，謝謝！`;
-                    
-                    // 優先複製到剪貼簿作為雙重備份
-                    navigator.clipboard.writeText(text).catch(() => {});
-                    
-                    // 使用 LINE 官方預填訊息網址 (oaMessage)，自動帶入文字並直接喚醒 LINE
-                    const lineOaUrl = `https://line.me/R/oaMessage/@071jlkwy/?${encodeURIComponent(text)}`;
-                    window.open(lineOaUrl, "_blank");
-                  }}
-                  className="px-3.5 py-1.5 bg-[#8E7456] hover:bg-[#7d6449] text-[#F9F1D0] rounded-xl text-[11px] font-bold shadow transition-all"
-                >
-                  前往LINE預約💬
-                </button>
+
+              {/* 已選日期與操作按鈕 */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-[12px] font-bold">✨ 已勾選 {selectedDates.length} 個日期</span>
+                  <span className="text-[10px] text-[#CDBEAD] truncate max-w-[160px]">
+                    {selectedDates.sort().join(', ')}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setSelectedDates([]); setSelectedServices([]); }}
+                    className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold transition-all"
+                  >
+                    清除
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const sortedDates = [...selectedDates].sort();
+                      const serviceStr = selectedServices.length > 0 ? `預約項目：${selectedServices.join('、')}\n` : '預約項目：未指定\n';
+                      const text = `您好，我想預約以下內容：\n${serviceStr}預約日期：${sortedDates.join(', ')}\n再請幫我確認檔期，謝謝！`;
+                      
+                      // 優先複製到剪貼簿作為雙重備份
+                      navigator.clipboard.writeText(text).catch(() => {});
+                      
+                      // 使用 LINE 官方預填訊息網址 (oaMessage)，自動帶入文字並直接喚醒 LINE
+                      const lineOaUrl = `https://line.me/R/oaMessage/@071jlkwy/?${encodeURIComponent(text)}`;
+                      window.open(lineOaUrl, "_blank");
+                    }}
+                    className="px-3.5 py-1.5 bg-[#8E7456] hover:bg-[#7d6449] text-[#F9F1D0] rounded-xl text-[11px] font-bold shadow transition-all"
+                  >
+                    前往LINE確認檔期💬
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -595,7 +631,7 @@
             >
               <span>LINE</span>
               <span className="absolute right-full mr-2.5 px-2.5 py-1 bg-[#5D4B41] text-[#F8F6F2] text-[11px] rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                LINE 諮詢聊聊💬
+                LINE 快速預約💬
               </span>
             </a>
           </div>
