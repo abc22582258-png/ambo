@@ -15,6 +15,18 @@
     html {
       -webkit-text-size-adjust: 100%;
     }
+    @keyframes marqueeScroll {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    .animate-marquee {
+      display: inline-block;
+      white-space: nowrap;
+      animation: marqueeScroll 16s linear infinite;
+    }
+    .animate-marquee:hover, .animate-marquee:active {
+      animation-play-state: paused;
+    }
   </style>
 </head>
 <body class="bg-[#e0d6cd]" style="-webkit-text-size-adjust: 100%;">
@@ -43,6 +55,7 @@
       const [selectedDates, setSelectedDates] = useState([]); // 訪客多選預約日期
       const [selectedServices, setSelectedServices] = useState([]); // 訪客多選預約項目
       const [noticeText, setNoticeText] = useState("🗓每月25號20:00開放「下下個月」預約。\n\n💬 如果想預約的日期已額滿，\n可留言排候補，有釋出名額會通知您♡\n\n▪️採定金制，請確認時間再進行預約。\n▪️收到「完成預約✅」即成功保留時段♡\n"); // 預約須知內容
+      const [marqueeText, setMarqueeText] = useState("✨ 歡迎來到 AMBO 美學工作室，最新檔期開放預約中 ♡"); // 跑馬燈公告文字
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +76,10 @@
       const [showNoticeModal, setShowNoticeModal] = useState(true);
       const [isEditingNotice, setIsEditingNotice] = useState(false);
       const [tempNoticeText, setTempNoticeText] = useState("");
+
+      // 跑馬燈編輯彈窗狀態 (管理員編輯用)
+      const [showMarqueeModal, setShowMarqueeModal] = useState(false);
+      const [tempMarqueeText, setTempMarqueeText] = useState("");
 
       // 月份切換動態轉場效果狀態 (Smooth Fade-in & Flip)
       const [isAnimating, setIsAnimating] = useState(true);
@@ -102,6 +119,7 @@
             if (data.notes) setDayNotes(data.notes);
             if (data.monthStatuses) setMonthStatuses(data.monthStatuses);
             if (data.notice) setNoticeText(data.notice);
+            if (data.marquee !== undefined) setMarqueeText(data.marquee);
             setSyncStatus("✨已同步");
           } else {
             setSyncStatus("✨ 尚無排班資料");
@@ -231,6 +249,11 @@
         setIsEditingNotice(false);
       };
 
+      const handleSaveMarquee = () => {
+        setMarqueeText(tempMarqueeText.trim());
+        setShowMarqueeModal(false);
+      };
+
       const toggleMonthStatus = (monthKey) => {
         if (isReadOnly) return;
         setMonthStatuses(prev => {
@@ -255,7 +278,8 @@
               statuses: dayStatuses, 
               notes: dayNotes, 
               monthStatuses: monthStatuses,
-              notice: noticeText 
+              notice: noticeText,
+              marquee: marqueeText
             })
           });
 
@@ -524,6 +548,50 @@
             
           </div>
 
+          {/* 📢 樣式一：溫暖奶茶膠囊風跑馬燈 (纖細膠囊、內縮奶黃色虛線邊框、超可愛手繪小喇叭) */}
+          {(marqueeText.trim() !== "" || !isReadOnly) && (
+            <div className="w-full max-w-[400px] mt-3 p-[3px] bg-[#D7C4B4]/70 rounded-full shadow-sm">
+              <div className="w-full px-3 py-1 rounded-full border-[1.5px] border-dashed border-[#F9F1D0] flex items-center gap-2 overflow-hidden relative">
+                {/* 超可愛日系手繪小喇叭圖示（圓潤造型 + 小愛心音波） */}
+                <div className="shrink-0 text-[#5D4B41] flex items-center justify-center bg-[#F9F1D0]/90 w-5 h-5 rounded-full shadow-xs">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    {/* 圓滾滾喇叭主體 */}
+                    <path d="M14.5 5.5C14.5 4.7 13.6 4.2 12.9 4.7L8.5 8H5.5C4.1 8 3 9.1 3 10.5V12.5C3 13.9 4.1 15 5.5 15H6.2L7.3 18.2C7.6 19 8.4 19.4 9.2 19.1C9.9 18.8 10.3 18 10 17.3L9.2 15H12.9C13.6 15.5 14.5 15 14.5 14.2V5.5Z" fill="#5D4B41"/>
+                    {/* 可愛小音波與小愛心點綴 */}
+                    <path d="M17 8.5C17.8 9.4 18.2 10.4 18.2 11.5C18.2 12.6 17.8 13.6 17 14.5" stroke="#C97B7E" strokeWidth="2.5" strokeLinecap="round"/>
+                    <circle cx="20.5" cy="11.5" r="1.8" fill="#C97B7E"/>
+                  </svg>
+                </div>
+
+                {/* 跑馬燈文字區 */}
+                <div className="flex-1 overflow-hidden relative h-4 flex items-center">
+                  {marqueeText.trim() !== "" ? (
+                    <div className="w-full overflow-hidden">
+                      <div className={`text-[11.5px] font-bold text-[#5D4B41] tracking-wider leading-none ${marqueeText.length > 18 ? 'animate-marquee' : 'text-center w-full truncate'}`}>
+                        {marqueeText}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-[#5D4B41]/70 italic leading-none">（目前無公告，訪客畫面已自動隱藏）</span>
+                  )}
+                </div>
+
+                {/* 管理員編輯按鈕 */}
+                {!isReadOnly && (
+                  <button 
+                    onClick={() => {
+                      setTempMarqueeText(marqueeText);
+                      setShowMarqueeModal(true);
+                    }}
+                    className="shrink-0 px-2 py-0.5 bg-[#5D4B41] hover:bg-[#4a3b33] text-[#F8F6F2] text-[10px] font-bold rounded-full transition-all shadow-sm leading-none"
+                  >
+                    ✏️ 編輯
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 訪客多選預約浮動列（包含服務項目複選與確認檔期按鈕） */}
           {selectedDates.length > 0 && isReadOnly && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[390px] bg-[#5D4B41] text-[#F8F6F2] px-4 py-3.5 rounded-2xl shadow-xl flex flex-col gap-3 z-50">
@@ -604,8 +672,9 @@
             </div>
           )}
 
+          {/* 最下方訪客瀏覽模式切換鈕 */}
           {isReadOnly && (
-            <div className="mt-4 px-4 py-2 bg-[#F8F6F2]/50 hover:bg-[#F8F6F2] rounded-full text-[#A89B90] hover:text-[#5D4B41] text-[11px] font-bold tracking-widest transition-all cursor-pointer shadow-sm"
+            <div className="mt-3.5 px-4 py-2 bg-[#F8F6F2]/50 hover:bg-[#F8F6F2] rounded-full text-[#A89B90] hover:text-[#5D4B41] text-[11px] font-bold tracking-widest transition-all cursor-pointer shadow-sm"
                  onClick={() => setShowLoginModal(true)}>
               ✦ 訪客瀏覽模式 (點此登入管理員) ✦
             </div>
@@ -641,6 +710,47 @@
               </span>
             </a>
           </div>
+
+          {/* 編輯跑馬燈彈窗 */}
+          {showMarqueeModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowMarqueeModal(false)}>
+              <div className="bg-[#F8F6F2] rounded-3xl p-6 w-full max-w-[330px] shadow-xl flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-[16px] font-bold text-[#5D4B41] mb-1">📢 編輯動態公告跑馬燈</h3>
+                <p className="text-[11px] text-[#A89B90] mb-4 text-center">輸入想公告的文字（若留空並儲存，訪客畫面會自動隱藏跑馬燈喔！）</p>
+                <textarea 
+                  rows="3"
+                  placeholder="例如：✨ 12月美睫霧眉開放預約中，歡迎把握！" 
+                  value={tempMarqueeText}
+                  onChange={(e) => setTempMarqueeText(e.target.value)}
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#CDBEAD] bg-white text-[#5D4B41] text-[13px] outline-none resize-none mb-3 shadow-inner"
+                />
+                <div className="flex gap-2 w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => setTempMarqueeText("")}
+                    className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-xl text-[12px]"
+                  >
+                    清空
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowMarqueeModal(false)}
+                    className="flex-1 py-2 bg-gray-200 text-[#5D4B41] font-bold rounded-xl text-[13px]"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleSaveMarquee}
+                    className="flex-1 py-2 bg-[#5D4B41] text-white font-bold rounded-xl text-[13px] shadow"
+                  >
+                    確認套用
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 預約須知彈窗 */}
           {showNoticeModal && (
