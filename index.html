@@ -55,7 +55,7 @@
       const [selectedDates, setSelectedDates] = useState([]); // 訪客多選預約日期
       const [selectedServices, setSelectedServices] = useState([]); // 訪客多選預約項目
       const [noticeText, setNoticeText] = useState("🗓每月25號20:00開放「下下個月」預約。\n\n💬 如果想預約的日期已額滿，\n可留言排候補，有釋出名額會通知您♡\n\n▪️採定金制，請確認時間再進行預約。\n▪️收到「完成預約✅」即成功保留時段♡\n"); // 預約須知內容
-      const [marqueeText, setMarqueeText] = useState("✨ 歡迎來到 AMBO 美學工作室，最新檔期開放預約中 ♡"); // 跑馬燈公告文字
+      const [marqueeText, setMarqueeText] = useState(""); // 跑馬燈公告文字
       const [isReadOnly, setIsReadOnly] = useState(true); 
       const [syncStatus, setSyncStatus] = useState("連線中...");
       const [isSaving, setIsSaving] = useState(false);
